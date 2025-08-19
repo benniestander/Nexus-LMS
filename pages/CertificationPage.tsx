@@ -19,40 +19,70 @@ declare global {
 // ===== 1. CERTIFICATION PAGE (for Students)
 // ====================================================================================
 
-const logoUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAlgAAACDCAYAAACR09HaAAAACXBIWXMAAAsSAAALEgHS3X78AAARAUlEQVR4nO3df2xV9b3/8fdzL3t30213tG3sWlgb1AotlCglgqB8yA/UoPggxPCDmPgDP1L8oAY1/GESVYxIKQ+plfgDNUYhUtUPfGAKqC+kPjBpbWtrhXa9lm27u93t3vvxPGZ3s7t3s5t95+wkP59PJDf7zuOMz/Oez+fMzjIAAAAAAJiZ/NfuAQAAAABgqUwwAAAAAAAAAABmBhMMAAAAAAAAAABgZhAMAAAAAAAAAAAAZjYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAYGYQDAAAAAAAAAAAY";
+const CertificateTemplate: React.FC<{ course: Course, user: User, completionDate: string }> = ({ course, user, completionDate }) => {
+    const backgroundUrl = 'https://i.postimg.cc/P5hDjCLK/Nexus-Certificates-1-LE-upscale-balanced-x4.jpg';
 
-const CertificateTemplate: React.FC<{ course: Course, user: User, completionDate: string }> = ({ course, user, completionDate }) => (
-    <div id={`certificate-${course.id}-${user.id}`} className="w-[1123px] h-[794px] p-5 bg-gray-100 font-sans">
-        <div className="w-full h-full border-[10px] border-[--brand-blue] p-10 relative bg-white shadow-2xl flex flex-col justify-between">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[12em] font-black text-blue-600/10 z-10 select-none">
-                NEXUS
+    return (
+        <div 
+            id={`certificate-${course.id}-${user.id}`} 
+            className="w-[1123px] h-[794px] bg-cover bg-center relative text-black"
+            style={{ 
+                backgroundImage: `url(${backgroundUrl})`,
+                fontFeatureSettings: '"liga" 0', // Disables ligatures that might mess up text rendering on images
+            }}
+        >
+            {/* Recipient's Name */}
+            <div
+                style={{
+                    position: 'absolute',
+                    top: 'calc(47.5% - 30px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    color: '#18608C',
+                }}
+            >
+                {`${user.firstName} ${user.lastName}`}
             </div>
             
-            <header className="flex flex-col items-center justify-center gap-4 border-b-4 border-double border-gray-300 pb-5 relative z-20 text-center">
-                <img src={logoUrl} alt="Nexus Logo" className="h-16" />
-                <h1 className="text-4xl text-[--brand-blue] m-0 uppercase tracking-widest font-bold">Certificate of Achievement</h1>
-            </header>
+            {/* Course Name */}
+            <div
+                style={{
+                    position: 'absolute',
+                    top: 'calc(55% - 15px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontFamily: 'Poppins, sans-serif',
+                    fontSize: '28px',
+                    fontWeight: 400,
+                    textAlign: 'center',
+                    color: '#18608C',
+                }}
+            >
+                {course.title}
+            </div>
 
-            <main className="text-center my-16 relative z-20">
-                <p className="text-2xl text-gray-700 mb-2.5">This certificate is proudly presented to</p>
-                <h2 className="font-['Great_Vibes',_cursive] text-7xl text-[--brand-pink] my-5">{`${user.firstName} ${user.lastName}`}</h2>
-                <p className="text-2xl text-gray-700 mb-2.5">for successfully completing the course</p>
-                <h3 className="text-4xl text-[--brand-blue] mt-2.5 font-semibold">{course.title}</h3>
-            </main>
-
-            <footer className="flex justify-between items-end border-t-2 border-gray-300 pt-5 relative z-20">
-                <div className="text-center">
-                    <p className="font-['Great_Vibes',_cursive] text-4xl text-gray-800">{course.instructorName}</p>
-                    <p className="text-base text-gray-800 border-t border-gray-800 pt-1.5 mt-1.5">Lead Instructor</p>
-                </div>
-                <div className="text-center">
-                    <p className="font-['Great_Vibes',_cursive] text-4xl text-gray-800">{completionDate}</p>
-                    <p className="text-base text-gray-800 border-t border-gray-800 pt-1.5 mt-1.5">Date of Completion</p>
-                </div>
-            </footer>
+            {/* Completion Date */}
+            <div
+                style={{
+                    position: 'absolute',
+                    top: 'calc(84.5% - 80px)',
+                    left: 'calc(76.5% - 140px)',
+                    transform: 'translateX(-50%)',
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontSize: '18px',
+                    textAlign: 'center',
+                    color: '#333',
+                }}
+            >
+                {completionDate}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 
 const CertificationPageComponent: React.FC<{ user: User; courses: Course[]; enrollments: Enrollment[]; }> = ({ user, courses, enrollments }) => {
@@ -72,10 +102,12 @@ const CertificationPageComponent: React.FC<{ user: User; courses: Course[]; enro
         
         const { jsPDF } = window.jspdf;
         try {
-            const canvas = await window.html2canvas(certificateElement, { scale: 2 });
+            const canvas = await window.html2canvas(certificateElement, { scale: 2, useCORS: true });
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1123, 794] });
-            pdf.addImage(imgData, 'PNG', 0, 0, 1123, 794);
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
             pdf.save(`Nexus_Certificate_${course.title.replace(/\s/g, '_')}.pdf`);
         } catch (error) { console.error("Error generating PDF:", error); } 
         finally { setIsDownloading(null); }
@@ -190,10 +222,12 @@ const StudentDetailModal: React.FC<{
             
             const { jsPDF } = window.jspdf;
             try {
-                const canvas = await window.html2canvas(certificateElement, { scale: 2 });
+                const canvas = await window.html2canvas(certificateElement, { scale: 2, useCORS: true });
                 const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1123, 794] });
-                pdf.addImage(imgData, 'PNG', 0, 0, 1123, 794);
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 pdf.save(`Nexus_Certificate_${student.firstName}_${student.lastName}_${course.title.replace(/\s/g, '_')}.pdf`);
             } catch (error) {
                 console.error("Error generating PDF:", error);
