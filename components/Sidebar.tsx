@@ -65,8 +65,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
     ],
     [Role.ADMIN]: [
       { view: 'dashboard', icon: <LayoutDashboardIcon />, label: 'Dashboard' },
+      // Instructor capabilities
+      { view: 'my-courses', icon: <BookOpenIcon />, label: 'My Courses' },
+      { view: 'student-management', icon: <UsersIcon />, label: 'Student Management' },
+      { view: 'analytics', icon: <BarChart2Icon />, label: 'Analytics' },
+      // Admin capabilities
       { view: 'user-management', icon: <UsersIcon />, label: 'User Management' },
       { view: 'platform-settings', icon: <SettingsIcon />, label: 'Settings' },
+      // Shared/Communication
+      { view: 'live-sessions', icon: <VideoIcon />, label: 'Live Sessions' },
+      { view: 'inbox', icon: <MailIcon />, label: 'Inbox' },
+      { view: 'calendar', icon: <CalendarIcon />, label: 'Calendar' },
+      { view: 'history', icon: <HistoryIcon />, label: 'History' },
     ],
   };
 
