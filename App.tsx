@@ -80,38 +80,61 @@ const App: React.FC = () => {
             setCalendarEvents(data.calendarEvents);
             setHistoryLogs(data.historyLogs);
             setLiveSessions(data.liveSessions);
+        } else {
+           throw new Error("Failed to load application data.");
         }
       } catch (error) {
           console.error("Failed to load app data:", error);
+          // Re-throw the error to be caught by the calling function
+          throw error;
       }
   }, []);
   
+  // Effect for the initial, one-time load sequence.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const checkUserAndLoadData = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-            try {
-                const userProfile = await api.getProfile(session.user.id);
-                if (userProfile) {
-                    await loadAppData(userProfile);
-                    authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
-                } else {
-                    console.error("User is authenticated but has no profile. Signing out.");
-                    await supabase.auth.signOut();
-                    authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be loaded. Please sign in again or contact support.' } });
-                }
-            } catch (error: any) {
-                console.error("Error during authentication state change:", error);
-                authDispatch({ type: 'SET_ERROR', payload: { error: 'An error occurred while fetching your profile.' } });
-            }
+          const userProfile = await api.getProfile(session.user.id);
+          if (userProfile) {
+            await loadAppData(userProfile);
+            authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
+          } else {
+            console.error("User is authenticated but has no profile. Signing out.");
+            await supabase.auth.signOut();
+            authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be loaded. Please sign in again or contact support.' } });
+          }
         } else {
-            authDispatch({ type: 'SET_UNAUTHENTICATED' });
+          authDispatch({ type: 'SET_UNAUTHENTICATED' });
         }
+      } catch (error) {
+        console.error("Error during initial application load:", error);
+        authDispatch({ type: 'SET_ERROR', payload: { error: 'An error occurred while starting the application.' } });
+      }
+    };
+
+    checkUserAndLoadData();
+  }, [loadAppData]); // This runs only once because loadAppData is memoized.
+
+  // Effect for handling live auth changes (e.g., logout in another tab).
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // If the user logs out and there was previously a user session.
+      if (event === 'SIGNED_OUT' && authState.status === 'AUTHENTICATED') {
+        authDispatch({ type: 'LOGOUT' });
+      }
+      // If a user signs in after the initial load (e.g., in another tab).
+      // A full reload is the most reliable way to ensure a clean state.
+      if (event === 'SIGNED_IN' && authState.status === 'UNAUTHENTICATED') {
+        window.location.reload();
+      }
     });
 
     return () => {
-        subscription.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, [loadAppData]);
+  }, [authState.status]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
