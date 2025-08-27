@@ -1,6 +1,6 @@
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useReducer } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
 import { Header } from './components/Header';
@@ -14,11 +14,44 @@ import * as api from './supabaseApi';
 
 type View = SidebarView;
 
-const App: React.FC = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+// --- FSM for Authentication State ---
+interface AuthState {
+  status: 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'ERROR';
+  user: User | null;
+  error: string | null;
+}
 
+type AuthAction =
+  | { type: 'SET_AUTHENTICATED'; payload: { user: User } }
+  | { type: 'SET_UNAUTHENTICATED' }
+  | { type: 'SET_ERROR'; payload: { error: string } }
+  | { type: 'LOGOUT' };
+
+const initialState: AuthState = {
+  status: 'LOADING',
+  user: null,
+  error: null,
+};
+
+const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+  switch (action.type) {
+    case 'SET_AUTHENTICATED':
+      return { ...state, status: 'AUTHENTICATED', user: action.payload.user, error: null };
+    case 'SET_UNAUTHENTICATED':
+      return { ...state, status: 'UNAUTHENTICATED', user: null, error: null };
+    case 'SET_ERROR':
+      return { ...state, status: 'ERROR', user: null, error: action.payload.error };
+    case 'LOGOUT':
+       return { ...initialState, status: 'UNAUTHENTICATED' };
+    default:
+      return state;
+  }
+};
+
+
+const App: React.FC = () => {
+  const [authState, authDispatch] = useReducer(authReducer, initialState);
+  
   // --- Live Data States ---
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -54,34 +87,24 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    // isLoading is true by default. We set it to false only when the initial auth check
-    // and data load is complete, preventing the app from getting stuck.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        try {
-            setSession(session);
-            if (session) {
+        if (session) {
+            try {
                 const userProfile = await api.getProfile(session.user.id);
                 if (userProfile) {
-                    setCurrentUser(userProfile);
                     await loadAppData(userProfile);
+                    authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
                 } else {
-                    // If a user is authenticated but has no profile, it's an invalid state.
-                    // It's safer to sign them out to avoid errors.
                     console.error("User is authenticated but has no profile. Signing out.");
                     await supabase.auth.signOut();
-                    setCurrentUser(null);
+                    authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be loaded. Please sign in again or contact support.' } });
                 }
-            } else {
-                // If there's no session, clear the user.
-                setCurrentUser(null);
+            } catch (error: any) {
+                console.error("Error during authentication state change:", error);
+                authDispatch({ type: 'SET_ERROR', payload: { error: 'An error occurred while fetching your profile.' } });
             }
-        } catch (error) {
-            console.error("Error during authentication state change:", error);
-            // Ensure user state is cleared on error.
-            setCurrentUser(null);
-        } finally {
-            // No matter the outcome (login, logout, error), the initial loading process is complete.
-            setIsLoading(false);
+        } else {
+            authDispatch({ type: 'SET_UNAUTHENTICATED' });
         }
     });
 
@@ -90,18 +113,18 @@ const App: React.FC = () => {
     };
   }, [loadAppData]);
 
-  const refetchData = useCallback(() => {
-    if (currentUser) {
-      loadAppData(currentUser);
-    }
-  }, [currentUser, loadAppData]);
-  
-  const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
-  const closeMobileMenu = () => setIsMobileMenuOpen(false);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  const refetchData = useCallback(() => {
+    if (authState.user) {
+      loadAppData(authState.user);
+    }
+  }, [authState.user, loadAppData]);
+  
+  const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
   
   const handleNavigate = (view: View) => {
     if (view === currentView && view === 'dashboard') {
@@ -151,13 +174,13 @@ const App: React.FC = () => {
   }
 
   const handleSendMessage = async (recipientIds: string[], subject: string, content: string) => {
-    if(!currentUser) return;
+    if(!authState.user) return;
     // Simplified: assumes 1-on-1, finds or creates convo
     for(const recipientId of recipientIds) {
-      let convo = conversations.find(c => c.participantIds.includes(currentUser.id) && c.participantIds.includes(recipientId));
+      let convo = conversations.find(c => c.participantIds.includes(authState.user!.id) && c.participantIds.includes(recipientId));
       if (!convo) {
         // Create conversation if it doesn't exist
-        const { data: newConvoData } = await supabase.from('conversations').insert({ participant_ids: [currentUser.id, recipientId] }).select().single();
+        const { data: newConvoData } = await supabase.from('conversations').insert({ participant_ids: [authState.user.id, recipientId] }).select().single();
         if (newConvoData) {
             // FIX: Use the exported snakeToCamel function to convert the new conversation data.
             convo = api.snakeToCamel(newConvoData);
@@ -167,7 +190,7 @@ const App: React.FC = () => {
       if (convo) {
         const newMessage = {
             conversationId: convo.id,
-            senderId: currentUser.id,
+            senderId: authState.user.id,
             subject,
             content,
             timestamp: new Date().toISOString()
@@ -191,12 +214,12 @@ const App: React.FC = () => {
   };
 
   const getEnrollmentForCourse = (courseId: string): Enrollment => {
-      if (!currentUser) throw new Error("User not logged in");
-      const existingEnrollment = enrollments.find(e => e.courseId === courseId && e.userId === currentUser.id);
+      if (!authState.user) throw new Error("User not logged in");
+      const existingEnrollment = enrollments.find(e => e.courseId === courseId && e.userId === authState.user!.id);
       if (existingEnrollment) return existingEnrollment;
       
       const newEnrollment: Enrollment = {
-          userId: currentUser.id,
+          userId: authState.user.id,
           courseId: courseId,
           progress: 0,
           completedLessonIds: [],
@@ -208,14 +231,13 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!currentUser) return null;
+    if (!authState.user) return null;
 
     if (editingCourse) {
         return (
-            // FIX: Added missing props to ManagementPages component.
             <ManagementPages
                 view="course-editor"
-                user={currentUser}
+                user={authState.user}
                 courseToEdit={editingCourse}
                 onSave={handleSaveCourse}
                 onExit={handleExitCourseEditor}
@@ -235,7 +257,7 @@ const App: React.FC = () => {
     if (currentView === 'player' && selectedCourse) {
         return (
             <CoursePlayer 
-              user={currentUser}
+              user={authState.user}
               course={selectedCourse}
               enrollment={getEnrollmentForCourse(selectedCourse.id)}
               onExit={handleExitPlayer}
@@ -247,9 +269,9 @@ const App: React.FC = () => {
     if (currentView === 'dashboard') {
         return (
              <StudentDashboard
-              user={currentUser}
+              user={authState.user}
               courses={courses}
-              enrollments={enrollments.filter(e => e.userId === currentUser.id)}
+              enrollments={enrollments.filter(e => e.userId === authState.user!.id)}
               onSelectCourse={handleSelectCourse}
               onNavigate={handleNavigate}
               onEditCourse={handleEditCourse}
@@ -260,7 +282,7 @@ const App: React.FC = () => {
     return (
         <ManagementPages
             view={currentView}
-            user={currentUser}
+            user={authState.user}
             courses={courses}
             enrollments={enrollments}
             allUsers={allUsers}
@@ -279,43 +301,60 @@ const App: React.FC = () => {
     )
   }
 
-  if (isLoading) {
+  switch (authState.status) {
+    case 'LOADING':
       return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"><div className="bg-purple-600 text-white font-semibold px-6 py-3 rounded-lg">Loading Nexus...</div></div>;
-  }
-  
-  if (!session) {
+    
+    case 'UNAUTHENTICATED':
       return <Auth />;
-  }
 
-  if (!currentUser) {
-      return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">Could not load your profile. Please contact support.</div>;
-  }
+    case 'ERROR':
+       return (
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 p-4 text-center">
+          <div>
+            <h2 className="text-2xl font-bold text-red-500 mb-4">An Error Occurred</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">{authState.error}</p>
+            <button
+              onClick={handleLogout}
+              className="bg-pink-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-pink-600"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      );
 
-  return (
-    <div className="min-h-screen flex">
-      <Sidebar 
-        userRole={currentUser.role} 
-        onNavigate={handleNavigate} 
-        currentView={currentView} 
-        isMobileMenuOpen={isMobileMenuOpen}
-        closeMenu={closeMobileMenu}
-        onLogout={handleLogout}
-      />
-       {isMobileMenuOpen && (
-        <div 
-          onClick={closeMobileMenu} 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          aria-hidden="true"
-        ></div>
-      )}
-      <div className="flex-1 flex flex-col">
-        <Header user={currentUser} onLogout={handleLogout} onToggleMobileMenu={handleToggleMobileMenu} />
-        <main className="flex-1 overflow-y-auto h-[calc(100vh-80px)]">
-          {renderContent()}
-        </main>
-      </div>
-    </div>
-  );
+    case 'AUTHENTICATED':
+      if (!authState.user) {
+         // This case should ideally not be reached if the state is managed correctly, but it's a good safeguard.
+         return <div>Error: User authenticated but no user data found.</div>
+      }
+      return (
+        <div className="min-h-screen flex">
+          <Sidebar 
+            userRole={authState.user.role} 
+            onNavigate={handleNavigate} 
+            currentView={currentView} 
+            isMobileMenuOpen={isMobileMenuOpen}
+            closeMenu={closeMobileMenu}
+            onLogout={handleLogout}
+          />
+           {isMobileMenuOpen && (
+            <div 
+              onClick={closeMobileMenu} 
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              aria-hidden="true"
+            ></div>
+          )}
+          <div className="flex-1 flex flex-col">
+            <Header user={authState.user} onLogout={handleLogout} onToggleMobileMenu={handleToggleMobileMenu} />
+            <main className="flex-1 overflow-y-auto h-[calc(100vh-80px)]">
+              {renderContent()}
+            </main>
+          </div>
+        </div>
+      );
+  }
 };
 
 export default App;
