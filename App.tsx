@@ -52,25 +52,8 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    const fetchInitialSessionAndProfile = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-
-        if (session) {
-            const userProfile = await api.getProfile(session.user.id);
-            setCurrentUser(userProfile);
-            if(userProfile) {
-              await loadAppData(userProfile);
-            } else {
-              setIsLoading(false);
-            }
-        } else {
-            setIsLoading(false);
-        }
-    };
-    
-    fetchInitialSessionAndProfile();
-
+    // Rely solely on onAuthStateChange for session management.
+    // It fires once initially and then on every auth change.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
@@ -79,10 +62,12 @@ const App: React.FC = () => {
         if(userProfile) {
             await loadAppData(userProfile);
         } else {
+            console.error("User is authenticated but has no profile.");
             setIsLoading(false)
         }
       } else {
         setCurrentUser(null);
+        setIsLoading(false); // No user, stop loading.
       }
     });
 
@@ -287,7 +272,7 @@ const App: React.FC = () => {
   }
 
   if (!currentUser) {
-      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading your profile...</div>;
+      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Could not load your profile. Please contact support.</div>;
   }
 
   return (
