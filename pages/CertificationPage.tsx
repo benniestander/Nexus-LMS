@@ -293,129 +293,134 @@ const MyCoursesPage: React.FC<{ user: User; courses: Course[]; onEditCourse: (co
 
 
 // ====================================================================================
-// ===== 3. COURSE EDITOR (for Instructors/Admins)
+// ===== 3. COURSE EDITOR (for Instructors/Admins) - RESTORED FULL FUNCTIONALITY
 // ====================================================================================
+const QuizEditor: React.FC<{ quizData: QuizData; onUpdate: (data: QuizData) => void; }> = ({ quizData, onUpdate }) => {
+    const updateField = (field: keyof QuizData, value: any) => onUpdate({ ...quizData, [field]: value });
 
-const LessonEditor: React.FC<{ lesson: Lesson; onUpdate: (updatedLesson: Lesson) => void; onDelete: () => void; }> = ({ lesson, onUpdate, onDelete }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const handleQuestionChange = (qIndex: number, text: string) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].questionText = text;
+        updateField('questions', newQuestions);
+    };
 
-    const updateField = (field: keyof Lesson | `content.${keyof Lesson['content']}`, value: any) => {
-        if (typeof field === 'string' && field.startsWith('content.')) {
-            const contentField = field.split('.')[1] as keyof Lesson['content'];
-            onUpdate({ ...lesson, content: { ...lesson.content, [contentField]: value } });
-        } else {
-            onUpdate({ ...lesson, [field]: value });
-        }
+    const handleOptionChange = (qIndex: number, oIndex: number, text: string) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options[oIndex] = text;
+        updateField('questions', newQuestions);
+    };
+
+    const setCorrectAnswer = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].correctAnswerIndex = oIndex;
+        updateField('questions', newQuestions);
+    };
+
+    const addQuestion = () => {
+        const newQuestion: Question = {
+            id: crypto.randomUUID(),
+            questionText: '',
+            options: ['', ''],
+            correctAnswerIndex: 0
+        };
+        updateField('questions', [...quizData.questions, newQuestion]);
     };
     
-    const lessonIcons: Record<LessonType, React.ReactElement> = {
-        [LessonType.VIDEO]: <PlayCircleIcon className="w-5 h-5 text-red-500" />,
-        [LessonType.TEXT]: <FileTextIcon className="w-5 h-5 text-blue-500" />,
-        [LessonType.PDF]: <FileTextIcon className="w-5 h-5 text-purple-500" />,
-        [LessonType.QUIZ]: <ClipboardListIcon className="w-5 h-5 text-green-500" />,
+    const removeQuestion = (qIndex: number) => updateField('questions', quizData.questions.filter((_, i) => i !== qIndex));
+    const addOption = (qIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options.push('');
+        updateField('questions', newQuestions);
     };
+    const removeOption = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options = newQuestions[qIndex].options.filter((_, i) => i !== oIndex);
+        if (newQuestions[qIndex].correctAnswerIndex === oIndex) {
+            newQuestions[qIndex].correctAnswerIndex = 0;
+        }
+        updateField('questions', newQuestions);
+    }
 
     return (
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center p-3">
-                 <GripVerticalIcon className="w-5 h-5 text-gray-400 cursor-grab flex-shrink-0" />
-                 <div className="ml-2 flex-shrink-0">{lessonIcons[lesson.type]}</div>
-                 <p className="ml-2 font-semibold flex-grow truncate">{lesson.title || "New Lesson"}</p>
-                 <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                     <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">
-                        {isExpanded ? <ChevronUpIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
-                    </button>
-                    <button onClick={onDelete} className="p-1.5 text-gray-500 hover:text-red-600 dark:hover:text-red-400">
-                        <Trash2Icon className="w-5 h-5" />
-                    </button>
-                 </div>
+        <div className="space-y-6">
+            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                <label htmlFor="passingScore" className="block text-sm font-bold text-gray-700 dark:text-gray-300">Passing Score (%)</label>
+                <input id="passingScore" type="number" value={quizData.passingScore} onChange={e => updateField('passingScore', parseInt(e.target.value) || 80)} className="mt-1 w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600" />
             </div>
-            {isExpanded && (
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-                    <input type="text" value={lesson.title} onChange={e => updateField('title', e.target.value)} placeholder="Lesson Title" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                    <div className="flex items-center gap-4">
-                        <select value={lesson.type} onChange={e => updateField('type', e.target.value as LessonType)} className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-                            {Object.values(LessonType).map(type => <option key={type} value={type} className="capitalize">{type}</option>)}
-                        </select>
-                        <div className="flex items-center gap-2">
-                            <ClockIcon className="w-4 h-4 text-gray-500" />
-                            <input type="number" value={lesson.duration} onChange={e => updateField('duration', parseInt(e.target.value) || 0)} placeholder="Duration (min)" className="w-24 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                             <span className="text-sm text-gray-500">min</span>
-                        </div>
+            {quizData.questions.map((q, qIndex) => (
+                <div key={q.id} className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-bold">Question {qIndex + 1}</h4>
+                        <button onClick={() => removeQuestion(qIndex)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-full"><Trash2Icon className="w-5 h-5"/></button>
                     </div>
-                    {lesson.type === LessonType.VIDEO && <input type="text" value={lesson.content.videoId || ''} onChange={e => updateField('content.videoId', e.target.value)} placeholder="YouTube Video ID" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
-                    {lesson.type === LessonType.TEXT && <textarea value={lesson.content.text || ''} onChange={e => updateField('content.text', e.target.value)} placeholder="Lesson text content..." rows={5} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
-                    {lesson.type === LessonType.PDF && <input type="text" value={lesson.content.pdfUrl || ''} onChange={e => updateField('content.pdfUrl', e.target.value)} placeholder="PDF URL" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
-                    {lesson.type === LessonType.QUIZ && <p className="text-sm text-center text-gray-500 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">Quiz questions are managed in the dedicated Quiz Builder (coming soon).</p>}
+                    <textarea value={q.questionText} onChange={e => handleQuestionChange(qIndex, e.target.value)} placeholder="Question text..." rows={2} className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 mb-3" />
+                    <div className="space-y-2">
+                        {q.options.map((opt, oIndex) => (
+                            <div key={oIndex} className="flex items-center gap-2">
+                                <input type="radio" name={`correct-answer-${q.id}`} checked={q.correctAnswerIndex === oIndex} onChange={() => setCorrectAnswer(qIndex, oIndex)} className="h-5 w-5 text-pink-600 focus:ring-pink-500" />
+                                <input type="text" value={opt} onChange={e => handleOptionChange(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-grow p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600" />
+                                <button onClick={() => removeOption(qIndex, oIndex)} className="p-1.5 text-gray-500 hover:text-red-500" disabled={q.options.length <= 1}><XIcon className="w-4 h-4"/></button>
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={() => addOption(qIndex)} className="mt-3 text-sm font-semibold text-pink-500 hover:text-pink-600">+ Add Option</button>
                 </div>
-            )}
+            ))}
+            <button onClick={addQuestion} className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                <PlusCircleIcon className="w-5 h-5" /> Add Question
+            </button>
         </div>
     );
 };
 
-const ModuleEditor: React.FC<{ module: Module; onUpdate: (updatedModule: Module) => void; onDelete: () => void; }> = ({ module, onUpdate, onDelete }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
+const LessonEditModal: React.FC<{
+  lesson: Lesson;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (lesson: Lesson) => void;
+}> = ({ lesson: initialLesson, isOpen, onClose, onSave }) => {
+    const [lesson, setLesson] = useState(initialLesson);
+    useEffect(() => setLesson(initialLesson), [initialLesson]);
     
-    const updateTitle = (title: string) => onUpdate({ ...module, title });
-
-    const handleLessonUpdate = (updatedLesson: Lesson, index: number) => {
-        const newLessons = [...module.lessons];
-        newLessons[index] = updatedLesson;
-        onUpdate({ ...module, lessons: newLessons });
+    const updateField = (field: keyof Lesson | `content.${keyof Lesson['content']}`, value: any) => {
+        if (typeof field === 'string' && field.startsWith('content.')) {
+            const contentField = field.split('.')[1] as keyof Lesson['content'];
+            setLesson(prev => ({ ...prev, content: { ...prev.content, [contentField]: value }}));
+        } else {
+            setLesson(prev => ({ ...prev, [field]: value }));
+        }
     };
-
-    const handleLessonDelete = (index: number) => {
-        const newLessons = module.lessons.filter((_, i) => i !== index);
-        onUpdate({ ...module, lessons: newLessons });
-    };
-
-    const handleAddLesson = () => {
-        const newLesson: Lesson = {
-            id: crypto.randomUUID(),
-            moduleId: module.id,
-            title: `New Lesson ${module.lessons.length + 1}`,
-            type: LessonType.VIDEO,
-            content: {},
-            duration: 10,
-            order: module.lessons.length
-        };
-        onUpdate({ ...module, lessons: [...module.lessons, newLesson] });
-    };
-
+    
+    if (!isOpen) return null;
+    
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-t-xl">
-                <GripVerticalIcon className="w-5 h-5 text-gray-400 cursor-grab" />
-                <input 
-                    type="text"
-                    value={module.title}
-                    onChange={e => updateTitle(e.target.value)}
-                    placeholder="Module Title"
-                    className="flex-grow font-bold text-lg p-2 bg-transparent focus:outline-none focus:bg-white dark:focus:bg-gray-600 rounded-md"
-                />
-                 <button onClick={() => setIsExpanded(!isExpanded)} className="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">
-                    {isExpanded ? <ChevronUpIcon className="w-6 h-6" /> : <ChevronDownIcon className="w-6 h-6" />}
-                </button>
-                <button onClick={onDelete} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400">
-                    <Trash2Icon className="w-6 h-6" />
-                </button>
-            </div>
-            {isExpanded && (
-                <div className="p-4 space-y-3">
-                    {module.lessons.map((lesson, index) => (
-                        <LessonEditor 
-                            key={lesson.id}
-                            lesson={lesson}
-                            onUpdate={(updated) => handleLessonUpdate(updated, index)}
-                            onDelete={() => handleLessonDelete(index)}
-                        />
-                    ))}
-                    <button onClick={handleAddLesson} className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
-                        <PlusCircleIcon className="w-5 h-5" />
-                        Add Lesson
-                    </button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
+                <h2 className="text-2xl font-bold mb-6">Edit Lesson</h2>
+                <div className="space-y-4">
+                    <input type="text" value={lesson.title} onChange={e => updateField('title', e.target.value)} placeholder="Lesson Title" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
+                    <div className="flex items-center gap-4">
+                        <select value={lesson.type} onChange={e => updateField('type', e.target.value as LessonType)} className="p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 capitalize">
+                            {Object.values(LessonType).map(type => <option key={type} value={type} className="capitalize">{type}</option>)}
+                        </select>
+                        <div className="flex items-center gap-2">
+                            <ClockIcon className="w-4 h-4 text-gray-500" />
+                            <input type="number" value={lesson.duration} onChange={e => updateField('duration', parseInt(e.target.value) || 0)} placeholder="Duration" className="w-24 p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
+                            <span className="text-sm text-gray-500">min</span>
+                        </div>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto p-1">
+                        {lesson.type === LessonType.VIDEO && <input type="text" value={lesson.content.videoId || ''} onChange={e => updateField('content.videoId', e.target.value)} placeholder="YouTube Video ID (e.g., dQw4w9WgXcQ)" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
+                        {lesson.type === LessonType.TEXT && <RichTextEditor label="Lesson Content" value={lesson.content.text || ''} onChange={val => updateField('content.text', val)} placeholder="Write your lesson content here..." />}
+                        {lesson.type === LessonType.PDF && <input type="text" value={lesson.content.pdfUrl || ''} onChange={e => updateField('content.pdfUrl', e.target.value)} placeholder="URL to PDF file" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
+                        {lesson.type === LessonType.QUIZ && <QuizEditor quizData={lesson.content.quizData || { questions: [], passingScore: 80 }} onUpdate={data => updateField('content.quizData', data)} />}
+                    </div>
                 </div>
-            )}
+                <div className="flex justify-end gap-4 mt-8">
+                    <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-600 font-semibold">Cancel</button>
+                    <button onClick={() => onSave(lesson)} className="px-5 py-2.5 rounded-lg bg-pink-500 text-white font-semibold">Save Lesson</button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -428,24 +433,33 @@ const CourseEditorPage: React.FC<{
 }> = ({ course: initialCourse, user, onSave, onExit }) => {
     const [course, setCourse] = useState<Course>(() => {
         if (initialCourse) return initialCourse;
-        // Default for a new course
-        return {
+        
+        const newCourseId = crypto.randomUUID();
+        const defaultModule: Module = {
             id: crypto.randomUUID(),
+            courseId: newCourseId,
+            title: 'Module 1: Introduction',
+            lessons: [],
+            order: 0,
+        };
+
+        return {
+            id: newCourseId,
             title: '',
             description: '',
             thumbnail: 'https://i.postimg.cc/k4xT4K4B/placeholder-course-thumbnail.png',
             category: 'Technology',
             instructorId: user.id,
             instructorName: `${user.firstName} ${user.lastName}`,
-            modules: [],
+            modules: [defaultModule], // Start with one default module
             totalLessons: 0,
             estimatedDuration: 0,
         };
     });
 
-    const updateCourseField = (field: keyof Course, value: any) => {
-        setCourse(prev => ({ ...prev, [field]: value }));
-    };
+    const [editingLesson, setEditingLesson] = useState<{ lesson: Lesson, mIndex: number, lIndex: number } | null>(null);
+
+    const updateCourseField = (field: keyof Course, value: any) => setCourse(prev => ({ ...prev, [field]: value }));
 
     const handleModuleUpdate = (updatedModule: Module, index: number) => {
         const newModules = [...course.modules];
@@ -453,36 +467,89 @@ const CourseEditorPage: React.FC<{
         setCourse(prev => ({ ...prev, modules: newModules }));
     };
     
-    const handleModuleDelete = (index: number) => {
-        const newModules = course.modules.filter((_, i) => i !== index);
-        setCourse(prev => ({ ...prev, modules: newModules }));
-    };
-
+    const handleModuleDelete = (index: number) => setCourse(prev => ({ ...prev, modules: course.modules.filter((_, i) => i !== index) }));
     const handleAddModule = () => {
-        const newModule: Module = {
-            id: crypto.randomUUID(),
-            courseId: course.id,
-            title: `New Module ${course.modules.length + 1}`,
-            lessons: [],
-            order: course.modules.length,
-        };
+        const newModule: Module = { id: crypto.randomUUID(), courseId: course.id, title: `New Module ${course.modules.length + 1}`, lessons: [], order: course.modules.length };
         setCourse(prev => ({ ...prev, modules: [...prev.modules, newModule] }));
     };
+
+    const handleAddLesson = (mIndex: number) => {
+        const newLesson: Lesson = { id: crypto.randomUUID(), moduleId: course.modules[mIndex].id, title: `New Lesson`, type: LessonType.VIDEO, content: {}, duration: 10, order: course.modules[mIndex].lessons.length };
+        setEditingLesson({ lesson: newLesson, mIndex, lIndex: -1 });
+    };
+
+    const handleSaveLesson = (updatedLesson: Lesson) => {
+        if (!editingLesson) return;
+        const { mIndex, lIndex } = editingLesson;
+        const newModules = [...course.modules];
+        const newLessons = [...newModules[mIndex].lessons];
+        if (lIndex > -1) {
+            newLessons[lIndex] = updatedLesson;
+        } else {
+            newLessons.push(updatedLesson);
+        }
+        newModules[mIndex].lessons = newLessons;
+        setCourse(prev => ({ ...prev, modules: newModules }));
+        setEditingLesson(null);
+    };
+
+    const handleLessonDelete = (mIndex: number, lIndex: number) => {
+        const newModules = [...course.modules];
+        newModules[mIndex].lessons = newModules[mIndex].lessons.filter((_, i) => i !== lIndex);
+        setCourse(prev => ({ ...prev, modules: newModules }));
+    }
     
     const handleSave = () => {
-        // Recalculate order before saving
+        const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
+        const totalMinutes = course.modules.reduce((sum, m) => sum + m.lessons.reduce((lSum, l) => lSum + l.duration, 0), 0);
+
         const finalCourse: Course = {
             ...course,
+            totalLessons,
+            estimatedDuration: Math.round(totalMinutes / 60),
             modules: course.modules.map((m, mIndex) => ({
                 ...m,
                 order: mIndex,
-                lessons: m.lessons.map((l, lIndex) => ({
-                    ...l,
-                    order: lIndex,
-                }))
+                lessons: m.lessons.map((l, lIndex) => ({ ...l, order: lIndex }))
             }))
         };
         onSave(finalCourse);
+    };
+
+    // --- Drag and Drop Logic ---
+    const dragItem = useRef<any>(null);
+    const dragOverItem = useRef<any>(null);
+
+    const handleDragStart = (e: React.DragEvent, params: any) => { dragItem.current = params; e.dataTransfer.effectAllowed = 'move'; }
+    const handleDragEnter = (e: React.DragEvent, params: any) => { dragOverItem.current = params; }
+    
+    const handleDrop = (e: React.DragEvent) => {
+        if (!dragItem.current || !dragOverItem.current) return;
+        const { mIndex: dragMIndex, lIndex: dragLIndex } = dragItem.current;
+        const { mIndex: overMIndex, lIndex: overLIndex } = dragOverItem.current;
+        
+        const newModules = [...course.modules];
+        // Module Drag
+        if (dragLIndex === undefined) {
+            const draggedModule = newModules.splice(dragMIndex, 1)[0];
+            newModules.splice(overMIndex, 0, draggedModule);
+            setCourse(prev => ({...prev, modules: newModules}));
+        } 
+        // Lesson Drag
+        else {
+            const draggedLesson = newModules[dragMIndex].lessons.splice(dragLIndex, 1)[0];
+            newModules[overMIndex].lessons.splice(overLIndex, 0, draggedLesson);
+            setCourse(prev => ({...prev, modules: newModules}));
+        }
+        dragItem.current = null;
+        dragOverItem.current = null;
+    };
+    
+    const lessonIcons: Record<LessonType, React.ReactElement> = {
+        [LessonType.VIDEO]: <PlayCircleIcon className="w-5 h-5 text-red-500" />,
+        [LessonType.TEXT]: <FileTextIcon className="w-5 h-5 text-blue-500" />,
+        [LessonType.PDF]: <FileTextIcon className="w-5 h-5 text-purple-500" />,
+        [LessonType.QUIZ]: <ClipboardListIcon className="w-5 h-5 text-green-500" />,
     };
 
     return (
@@ -491,52 +558,43 @@ const CourseEditorPage: React.FC<{
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                     <div>
                         <button onClick={onExit} className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-pink-500">
-                            <ChevronLeftIcon className="w-5 h-5" />
-                            Back to My Courses
+                            <ChevronLeftIcon className="w-5 h-5" /> Back to My Courses
                         </button>
-                         <h1 className="text-2xl font-bold mt-1">{initialCourse ? 'Edit Course' : 'Create New Course'}</h1>
+                         <h1 className="text-2xl font-bold mt-1">{initialCourse?.id ? 'Edit Course' : 'Create New Course'}</h1>
                     </div>
-                    <button onClick={handleSave} className="bg-pink-500 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-pink-600 transition-all">
-                        Save Course
-                    </button>
+                    <button onClick={handleSave} className="bg-pink-500 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-pink-600 transition-all">Save Course</button>
                 </div>
             </div>
             
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Course Details */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold mb-4">Course Details</h2>
-                        <div className="space-y-4">
-                            <input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} placeholder="Course Title" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
-                            <textarea value={course.description} onChange={e => updateCourseField('description', e.target.value)} placeholder="Course Description" rows={4} className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
-                            <input type="text" value={course.category} onChange={e => updateCourseField('category', e.target.value)} placeholder="Category (e.g., Technology)" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold mb-4">Course Thumbnail</h2>
-                        <img src={course.thumbnail} alt="Course Thumbnail" className="w-full h-48 object-cover rounded-md mb-4" />
-                        <input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} placeholder="Image URL" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" />
-                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6"><h2 className="text-xl font-bold mb-4">Course Details</h2><div className="space-y-4"><input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} placeholder="Course Title" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" /><textarea value={course.description} onChange={e => updateCourseField('description', e.target.value)} placeholder="Course Description" rows={4} className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" /><input type="text" value={course.category} onChange={e => updateCourseField('category', e.target.value)} placeholder="Category (e.g., Technology)" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" /></div></div>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6"><h2 className="text-xl font-bold mb-4">Course Thumbnail</h2><img src={course.thumbnail} alt="Course Thumbnail" className="w-full h-48 object-cover rounded-md mb-4" /><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} placeholder="Image URL" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600" /></div>
                 </div>
 
-                {/* Right Column: Modules and Lessons */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2" onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
                      <h2 className="text-xl font-bold mb-4">Course Content</h2>
-                     {course.modules.map((module, index) => (
-                        <ModuleEditor 
-                            key={module.id}
-                            module={module}
-                            onUpdate={(updated) => handleModuleUpdate(updated, index)}
-                            onDelete={() => handleModuleDelete(index)}
-                        />
+                     {course.modules.map((module, mIndex) => (
+                        <div key={module.id} draggable onDragStart={e => handleDragStart(e, {mIndex})} onDragEnter={e => handleDragEnter(e, {mIndex})} className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 mb-6">
+                            <div className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-t-xl cursor-grab"><GripVerticalIcon className="w-5 h-5 text-gray-400" /><input type="text" value={module.title} onChange={e => handleModuleUpdate({...module, title: e.target.value}, mIndex)} placeholder="Module Title" className="flex-grow font-bold text-lg p-2 bg-transparent focus:outline-none focus:bg-white dark:focus:bg-gray-600 rounded-md"/><button onClick={() => handleModuleDelete(mIndex)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><Trash2Icon className="w-6 h-6" /></button></div>
+                            <div className="p-4 space-y-3">
+                                {module.lessons.map((lesson, lIndex) => (
+                                    <div key={lesson.id} draggable onDragStart={e => { e.stopPropagation(); handleDragStart(e, {mIndex, lIndex}); }} onDragEnter={e => { e.stopPropagation(); handleDragEnter(e, {mIndex, lIndex}); }} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center p-3 cursor-grab">
+                                        <GripVerticalIcon className="w-5 h-5 text-gray-400 flex-shrink-0" /><div className="ml-2 flex-shrink-0">{lessonIcons[lesson.type]}</div><p className="ml-2 font-semibold flex-grow truncate">{lesson.title}</p>
+                                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                                            <button onClick={() => setEditingLesson({ lesson, mIndex, lIndex })} className="p-1.5 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"><EditIcon className="w-5 h-5" /></button>
+                                            <button onClick={() => handleLessonDelete(mIndex, lIndex)} className="p-1.5 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><Trash2Icon className="w-5 h-5" /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <button onClick={() => handleAddLesson(mIndex)} className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"><PlusCircleIcon className="w-5 h-5" /> Add Lesson</button>
+                            </div>
+                        </div>
                      ))}
-                     <button onClick={handleAddModule} className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 transition-colors">
-                        <PlusCircleIcon className="w-6 h-6" />
-                        Add Module
-                    </button>
+                     <button onClick={handleAddModule} className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 transition-colors"><PlusCircleIcon className="w-6 h-6" /> Add Module</button>
                 </div>
             </div>
+            {editingLesson && <LessonEditModal isOpen={!!editingLesson} lesson={editingLesson.lesson} onClose={() => setEditingLesson(null)} onSave={handleSaveLesson} />}
         </div>
     );
 };
@@ -656,7 +714,7 @@ const StudentManagementPage: React.FC<{ user: User, courses: Course[], enrollmen
             return isInstructorCourse && matchesCourseFilter;
         });
 
-        const studentData = new Map<string, { user: User, courses: { title: string, progress: number }[] }>();
+        const studentData = new Map<string, { user: User, courses: { id: string, title: string, progress: number }[] }>();
 
         studentEnrollments.forEach(enrollment => {
             const studentUser = allUsers.find(u => u.id === enrollment.userId);
@@ -666,6 +724,7 @@ const StudentManagementPage: React.FC<{ user: User, courses: Course[], enrollmen
                     studentData.set(studentUser.id, { user: studentUser, courses: [] });
                 }
                 studentData.get(studentUser.id)!.courses.push({
+                    id: course.id,
                     title: course.title,
                     progress: enrollment.progress,
                 });
@@ -703,7 +762,7 @@ const StudentManagementPage: React.FC<{ user: User, courses: Course[], enrollmen
                             </div>
                             <div className="col-span-2 space-y-2">
                                 {studentCourses.map(c => (
-                                    <div key={c.title}>
+                                    <div key={c.id}>
                                         <p className="text-sm font-medium">{c.title}</p>
                                         <ProgressBar progress={c.progress} size="sm" />
                                     </div>
@@ -742,411 +801,225 @@ const PlatformSettingsPage: React.FC<{}> = () => {
 };
 
 // ====================================================================================
-// ===== 7. INBOX/MESSAGING (for all roles)
+// ===== 7. INBOX PAGE
 // ====================================================================================
-
-const InboxPage: React.FC<{
-    user: User,
-    conversations: Conversation[],
-    messages: Message[],
-    allUsers: User[],
-    onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
-    onUpdateMessages: (messages: Message[]) => void;
+const InboxPage: React.FC<{ 
+    user: User; 
+    conversations: Conversation[];
+    messages: Message[];
+    allUsers: User[];
+    onSendMessage: (recipientIds: string[], subject: string, content: string) => Promise<void>;
+    onUpdateMessages: (updatedMessages: Message[]) => void;
 }> = ({ user, conversations, messages, allUsers, onSendMessage, onUpdateMessages }) => {
-    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+    
+    const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
     const [isComposing, setIsComposing] = useState(false);
-    
-    const getParticipant = (convo: Conversation) => {
-        const otherId = convo.participantIds.find(id => id !== user.id);
-        return allUsers.find(u => u.id === otherId);
-    };
 
-    const sortedConversations = useMemo(() => {
-        return [...conversations].sort((a, b) => new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime());
-    }, [conversations]);
-    
+    const enrichedConversations = useMemo(() => {
+        return conversations.map(convo => {
+            const otherParticipantId = convo.participantIds.find(id => id !== user.id);
+            const otherParticipant = allUsers.find(u => u.id === otherParticipantId);
+            const convoMessages = messages.filter(m => m.conversationId === convo.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            const lastMessage = convoMessages[0];
+            const unreadCount = convoMessages.filter(m => !m.isRead && m.senderId !== user.id).length;
+            return {
+                ...convo,
+                otherParticipant: otherParticipant || { firstName: 'Unknown', lastName: 'User', id: 'unknown' },
+                lastMessage: lastMessage?.content || 'No messages yet.',
+                lastMessageTimestamp: lastMessage?.timestamp,
+                unreadCount
+            };
+        }).sort((a,b) => new Date(b.lastMessageTimestamp || 0).getTime() - new Date(a.lastMessageTimestamp || 0).getTime());
+    }, [conversations, messages, allUsers, user.id]);
+
     const selectedConversationMessages = useMemo(() => {
-        if (!selectedConversationId) return [];
-        return messages.filter(m => m.conversationId === selectedConversationId).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    }, [messages, selectedConversationId]);
-    
+        if (!selectedConvoId) return [];
+        return messages.filter(m => m.conversationId === selectedConvoId).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    }, [messages, selectedConvoId]);
+
     const handleSelectConversation = (convoId: string) => {
-        setSelectedConversationId(convoId);
+        setSelectedConvoId(convoId);
         setIsComposing(false);
         // Mark messages as read
-        const updatedMessages = messages.map(m =>
-            m.conversationId === convoId && m.senderId !== user.id && !m.isRead ? { ...m, isRead: true } : m
+        const updatedMessages = messages.map(m => 
+            (m.conversationId === convoId && m.senderId !== user.id) ? { ...m, isRead: true } : m
         );
         onUpdateMessages(updatedMessages);
-        // FIX: Use the imported supabase client directly
-        supabase.from('messages').update({ is_read: true }).eq('conversation_id', convoId).neq('sender_id', user.id);
-    };
-    
-    const ComposeView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-        const [recipientId, setRecipientId] = useState('');
-        const [subject, setSubject] =useState('');
-        const [content, setContent] = useState('');
         
-        const handleSend = () => {
-            if (recipientId && content) {
-                onSendMessage([recipientId], subject, content);
-                onClose();
+        // Update in DB as well
+        supabase.from('messages')
+            .update({ is_read: true })
+            .eq('conversation_id', convoId)
+            .neq('sender_id', user.id)
+            .then(({ error }) => { if (error) console.error("Error marking messages as read:", error); });
+    };
+
+    const ComposeMessage: React.FC = () => {
+        const [recipient, setRecipient] = useState('');
+        const [subject, setSubject] = useState('');
+        const [content, setContent] = useState('');
+
+        const handleSend = async () => {
+            const recipientUser = allUsers.find(u => u.email === recipient);
+            if (!recipientUser) {
+                alert("Recipient not found");
+                return;
             }
+            await onSendMessage([recipientUser.id], subject, content);
+            setIsComposing(false);
         };
-
+        
         return (
-             <div className="p-4 h-full flex flex-col">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold">New Message</h3>
-                    <button onClick={onClose}><XIcon className="w-6 h-6"/></button>
-                </div>
-                 <select value={recipientId} onChange={e => setRecipientId(e.target.value)} className="w-full p-2 border rounded-md mb-2 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="">Select a recipient</option>
-                    {allUsers.filter(u => u.id !== user.id).map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>)}
-                </select>
-                <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" className="w-full p-2 border rounded-md mb-2 dark:bg-gray-700 dark:border-gray-600"/>
-                <textarea value={content} onChange={e => setContent(e.target.value)} rows={10} placeholder="Your message..." className="w-full p-2 border rounded-md flex-grow dark:bg-gray-700 dark:border-gray-600"/>
-                <button onClick={handleSend} className="mt-4 bg-pink-500 text-white font-semibold py-2 px-4 rounded-lg">Send</button>
+            <div className="p-4">
+                 <h3 className="text-xl font-bold">New Message</h3>
+                 <input type="email" placeholder="Recipient Email" value={recipient} onChange={e => setRecipient(e.target.value)} className="w-full mt-4 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                 <input type="text" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} className="w-full mt-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                 <textarea placeholder="Your message..." value={content} onChange={e => setContent(e.target.value)} rows={10} className="w-full mt-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                 <button onClick={handleSend} className="mt-4 bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg">Send</button>
             </div>
-        );
+        )
     };
+    
+    const ConversationView: React.FC<{ convo: typeof enrichedConversations[0] }> = ({ convo }) => {
+        const [reply, setReply] = useState('');
+        const messagesEndRef = useRef<HTMLDivElement>(null);
+        useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedConversationMessages]);
 
-    return (
-        <div className="h-full flex flex-col">
-            <div className="p-4 md:p-6 border-b dark:border-gray-700">
-                <h1 className="text-3xl font-bold">Inbox</h1>
-            </div>
-            <div className="flex-grow flex min-h-0">
-                <aside className="w-1/3 border-r dark:border-gray-700 flex flex-col">
-                    <div className="p-4 border-b dark:border-gray-700">
-                        <button onClick={() => { setIsComposing(true); setSelectedConversationId(null); }} className="w-full bg-pink-500 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2">
-                           <EditIcon className="w-5 h-5"/> New Message
-                        </button>
-                    </div>
-                    <div className="overflow-y-auto">
-                        {sortedConversations.map(convo => {
-                            const participant = getParticipant(convo);
-                            const lastMessage = messages.filter(m => m.conversationId === convo.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-                            const unreadCount = messages.filter(m => m.conversationId === convo.id && !m.isRead && m.senderId !== user.id).length;
-                            return (
-                                <div key={convo.id} onClick={() => handleSelectConversation(convo.id)} className={`p-4 cursor-pointer border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedConversationId === convo.id ? 'bg-pink-50 dark:bg-pink-900/30' : ''}`}>
-                                    <div className="flex justify-between items-center">
-                                        <p className="font-bold">{participant ? `${participant.firstName} ${participant.lastName}` : 'Unknown User'}</p>
-                                        {unreadCount > 0 && <span className="text-xs font-bold bg-pink-500 text-white rounded-full px-2 py-0.5">{unreadCount}</span>}
-                                    </div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{lastMessage?.subject}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{lastMessage?.content}</p>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </aside>
-                <main className="w-2/3 flex flex-col">
-                    {isComposing ? <ComposeView onClose={() => setIsComposing(false)} /> : selectedConversationId ? (
-                        <div className="flex-grow flex flex-col h-full">
-                            <div className="p-4 border-b dark:border-gray-700">
-                                <h2 className="text-xl font-bold">{getParticipant(conversations.find(c=>c.id === selectedConversationId)!)?.firstName} {getParticipant(conversations.find(c=>c.id === selectedConversationId)!)?.lastName}</h2>
-                            </div>
-                            <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                                {selectedConversationMessages.map(msg => (
-                                    <div key={msg.id} className={`flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-lg p-3 rounded-lg ${msg.senderId === user.id ? 'bg-pink-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                                            <p className="font-bold text-sm mb-1">{msg.subject}</p>
-                                            <p>{msg.content}</p>
-                                            <p className="text-xs opacity-70 mt-2 text-right">{new Date(msg.timestamp).toLocaleString()}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                             <div className="p-4 border-t dark:border-gray-700">
-                                <div className="relative">
-                                    <input type="text" placeholder="Reply..." className="w-full p-3 pr-12 border rounded-lg dark:bg-gray-600 dark:border-gray-500"/>
-                                    <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white p-2 rounded-lg"><SendIcon className="w-5 h-5"/></button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex-grow flex items-center justify-center text-center text-gray-500">
-                            <div>
-                                <MailIcon className="w-16 h-16 mx-auto text-gray-400"/>
-                                <p className="mt-4">Select a conversation or start a new message.</p>
-                            </div>
-                        </div>
-                    )}
-                </main>
-            </div>
-        </div>
-    );
-};
-
-
-// ====================================================================================
-// ===== 8. CALENDAR (for all roles)
-// ====================================================================================
-
-const CalendarPage: React.FC<{ user: User, events: CalendarEvent[] }> = ({ user, events }) => {
-    const [currentDate, setCurrentDate] = useState(new Date());
-
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-
-    const eventsByDate = useMemo(() => {
-        const map = new Map<string, CalendarEvent[]>();
-        events.forEach(event => {
-            const date = event.date; // YYYY-MM-DD
-            if (!map.has(date)) map.set(date, []);
-            map.get(date)!.push(event);
-        });
-        return map;
-    }, [events]);
-
-    const changeMonth = (offset: number) => {
-        setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
-    };
-
-    const EventBadge: React.FC<{event: CalendarEvent}> = ({ event }) => {
-        const colors = {
-            deadline: 'bg-red-500',
-            live_session: 'bg-blue-500',
-            assignment: 'bg-amber-500',
+        const handleReply = async () => {
+            if (!reply.trim()) return;
+            await onSendMessage([convo.otherParticipant.id], '', reply);
+            setReply('');
         };
-        return <div className={`mt-1 text-xs text-white p-1 rounded-md ${colors[event.type]}`}>{event.title}</div>
-    }
-
-    return (
-        <div className="p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold">Calendar</h1>
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => changeMonth(-1)}><ChevronLeftIcon className="w-6 h-6"/></button>
-                        <h2 className="text-xl font-semibold w-40 text-center">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
-                        <button onClick={() => changeMonth(1)}><ChevronRightIcon className="w-6 h-6"/></button>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                    <div className="grid grid-cols-7 text-center font-bold p-2 bg-gray-50 dark:bg-gray-700/50">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day}>{day}</div>)}
-                    </div>
-                    <div className="grid grid-cols-7">
-                        {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} className="border-r border-b dark:border-gray-700 h-32"></div>)}
-                        {Array.from({ length: daysInMonth }).map((_, day) => {
-                            const date = day + 1;
-                            const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-                            const dayEvents = eventsByDate.get(dateStr) || [];
-                            return (
-                                <div key={date} className="border-r border-b dark:border-gray-700 h-32 p-2">
-                                    <div className="font-semibold">{date}</div>
-                                    <div className="overflow-y-auto max-h-24">
-                                        {dayEvents.map(event => <EventBadge key={event.id} event={event} />)}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                         {/* Fill remaining cells to complete the grid */}
-                        {Array.from({ length: (7 - (firstDayOfMonth + daysInMonth) % 7) % 7 }).map((_, i) => <div key={`empty-end-${i}`} className="border-r border-b dark:border-gray-700 h-32"></div>)}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// ====================================================================================
-// ===== 9. HISTORY (for all roles)
-// ====================================================================================
-const HistoryPage: React.FC<{ user: User, logs: HistoryLog[] }> = ({ user, logs }) => {
-    
-    const actionIcons: Record<HistoryAction, React.ReactElement> = {
-        course_enrolled: <BookOpenIcon className="w-5 h-5 text-blue-500" />,
-        lesson_completed: <CheckCircle2Icon className="w-5 h-5 text-green-500" />,
-        quiz_passed: <ClipboardListIcon className="w-5 h-5 text-purple-500" />,
-        certificate_earned: <AwardIcon className="w-5 h-5 text-amber-500" />,
-        discussion_posted: <MessageSquareIcon className="w-5 h-5 text-pink-500" />,
-    };
-
-    const actionText: Record<HistoryAction, string> = {
-        course_enrolled: "Enrolled in course",
-        lesson_completed: "Completed lesson",
-        quiz_passed: "Passed quiz",
-        certificate_earned: "Earned certificate for",
-        discussion_posted: "Posted in discussion for",
-    };
-
-    return (
-         <div className="p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-10">
-                    <HistoryIcon className="w-16 h-16 mx-auto text-pink-500" />
-                    <h1 className="mt-4 text-4xl font-extrabold">My History</h1>
-                    <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">A log of your recent activity on Nexus.</p>
-                </div>
-                <div className="space-y-4">
-                    {logs.map(log => (
-                        <div key={log.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex items-center gap-4">
-                            <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-full">
-                                {actionIcons[log.action]}
-                            </div>
-                            <div>
-                                <p className="font-semibold">{actionText[log.action]}: <span className="text-blue-600 dark:text-blue-400">{log.targetName}</span></p>
-                                <p className="text-sm text-gray-500">{new Date(log.timestamp).toLocaleString()}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// ====================================================================================
-// ===== 10. LIVE SESSIONS (for Instructors/Admins)
-// ====================================================================================
-const LiveSessionsPage: React.FC<{
-    user: User,
-    liveSessions: LiveSession[],
-    courses: Course[],
-    onScheduleSession: (session: Omit<LiveSession, 'id'>) => Promise<void>,
-    onDeleteSession: (sessionId: string) => Promise<void>,
-}> = ({ user, liveSessions, courses, onScheduleSession, onDeleteSession }) => {
-    const [isScheduling, setIsScheduling] = useState(false);
-    
-    const instructorCourses = useMemo(() => courses.filter(c => user.role === Role.ADMIN || c.instructorId === user.id), [courses, user]);
-    
-    const ScheduleModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-        const [session, setSession] = useState<Omit<LiveSession, 'id' | 'instructorId'>>({
-            title: '', description: '', dateTime: '', duration: 60, audience: 'all'
-        });
-
-        const handleSave = async () => {
-            if (session.title && session.dateTime) {
-                await onScheduleSession({ ...session, instructorId: user.id });
-                onClose();
-            }
-        };
-
+        
         return (
-             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6">
-                    <h2 className="text-xl font-bold mb-4">Schedule New Live Session</h2>
-                    <div className="space-y-4">
-                        <input type="text" value={session.title} onChange={e => setSession({...session, title: e.target.value})} placeholder="Session Title" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                        <textarea value={session.description} onChange={e => setSession({...session, description: e.target.value})} placeholder="Description" rows={3} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                        <input type="datetime-local" value={session.dateTime} onChange={e => setSession({...session, dateTime: e.target.value})} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                        <input type="number" value={session.duration} onChange={e => setSession({...session, duration: parseInt(e.target.value)})} placeholder="Duration (min)" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
-                        <select value={session.audience} onChange={e => setSession({...session, audience: e.target.value})} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-                            <option value="all">All Students</option>
-                            {instructorCourses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex justify-end gap-4 mt-6">
-                        <button onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-600 font-semibold">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-pink-500 text-white font-semibold">Schedule</button>
-                    </div>
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b dark:border-gray-700 flex-shrink-0">
+                    <h3 className="font-bold">{convo.otherParticipant.firstName} {convo.otherParticipant.lastName}</h3>
+                </div>
+                <div className="flex-grow p-4 overflow-y-auto space-y-4">
+                    {selectedConversationMessages.map(msg => {
+                        const isSender = msg.senderId === user.id;
+                        const sender = isSender ? user : convo.otherParticipant;
+                        return (
+                            <div key={msg.id} className={`flex gap-3 ${isSender ? 'flex-row-reverse' : ''}`}>
+                                <UserCircleIcon className="w-8 h-8 text-gray-400 flex-shrink-0" />
+                                <div className={`p-3 rounded-lg max-w-md ${isSender ? 'bg-pink-500 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                    <p>{msg.content}</p>
+                                    <p className={`text-xs mt-2 ${isSender ? 'text-white/70' : 'text-gray-500'}`}>{new Date(msg.timestamp).toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                        )
+                    })}
+                    <div ref={messagesEndRef} />
+                </div>
+                <div className="p-4 border-t dark:border-gray-700 flex gap-2 flex-shrink-0">
+                    <input type="text" placeholder="Type your reply..." value={reply} onChange={e => setReply(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleReply()} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                    <button onClick={handleReply} className="bg-pink-500 text-white p-2 rounded-lg"><SendIcon className="w-5 h-5"/></button>
                 </div>
             </div>
         );
     };
 
+    const selectedConvo = enrichedConversations.find(c => c.id === selectedConvoId);
+
     return (
-         <div className="p-4 md:p-8">
-            <div className="max-w-5xl mx-auto">
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold">Live Sessions</h1>
-                        <p className="text-gray-500 dark:text-gray-400 mt-1">Manage and schedule live training sessions.</p>
-                    </div>
-                    <button onClick={() => setIsScheduling(true)} className="flex items-center gap-2 bg-pink-500 text-white font-semibold px-4 py-2.5 rounded-lg hover:bg-pink-600">
-                        <PlusCircleIcon className="w-5 h-5"/> Schedule Session
-                    </button>
+        <div className="h-full flex">
+            <div className="w-1/3 border-r dark:border-gray-700 flex flex-col">
+                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h2 className="text-xl font-bold">Inbox</h2>
+                    <button onClick={() => setIsComposing(true)} className="p-2 text-pink-500 hover:bg-pink-100 rounded-full"><EditIcon className="w-6 h-6"/></button>
                 </div>
-                 <div className="space-y-4">
-                    {liveSessions.map(session => (
-                        <div key={session.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex justify-between items-center">
-                            <div>
-                                <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{session.title}</p>
-                                <p className="text-sm text-gray-500">{new Date(session.dateTime).toLocaleString()}</p>
-                                <p className="text-sm text-gray-500">Audience: {session.audience === 'all' ? 'All Students' : courses.find(c=>c.id === session.audience)?.title}</p>
+                <div className="overflow-y-auto">
+                    {enrichedConversations.map(convo => (
+                        <div key={convo.id} onClick={() => handleSelectConversation(convo.id)} className={`p-4 border-b dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedConvoId === convo.id ? 'bg-pink-50 dark:bg-pink-900/30' : ''}`}>
+                            <div className="flex justify-between items-center">
+                                <p className="font-semibold">{convo.otherParticipant.firstName} {convo.otherParticipant.lastName}</p>
+                                {convo.unreadCount > 0 && <span className="text-xs font-bold bg-pink-500 text-white rounded-full px-2 py-0.5">{convo.unreadCount}</span>}
                             </div>
-                             <div className="flex items-center gap-2">
-                                <button onClick={() => onDeleteSession(session.id)} className="p-2 text-gray-500 hover:text-red-500"><Trash2Icon className="w-5 h-5"/></button>
-                                <a href="#" className="bg-blue-500 text-white text-sm font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">Join</a>
-                             </div>
+                            <p className="text-sm text-gray-500 truncate">{convo.lastMessage}</p>
                         </div>
                     ))}
                 </div>
-                {isScheduling && <ScheduleModal onClose={() => setIsScheduling(false)} />}
+            </div>
+            <div className="w-2/3">
+                {isComposing ? <ComposeMessage /> : selectedConvo ? <ConversationView convo={selectedConvo} /> : 
+                <div className="h-full flex items-center justify-center text-gray-500">Select a conversation or compose a new message.</div>
+                }
             </div>
         </div>
     );
 };
 
+// ====================================================================================
+// ===== 8. PROFILE PAGE
+// ====================================================================================
 
-// ====================================================================================
-// ===== 11. PROFILE (for all roles)
-// ====================================================================================
-const ProfilePage: React.FC<{ user: User, onSave: (updates: Partial<User> & { newPassword?: string }) => Promise<void> }> = ({ user, onSave }) => {
+const ProfilePage: React.FC<{ user: User, onSaveUserProfile: (updates: Partial<User> & { newPassword?: string }) => Promise<void> }> = ({ user, onSaveUserProfile }) => {
     const [profile, setProfile] = useState(user);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordError, setPasswordError] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
 
     const handleSave = () => {
-        let updates: Partial<User> & { newPassword?: string } = {};
-
+        const updates: Partial<User> & { newPassword?: string } = {};
         if (profile.firstName !== user.firstName) updates.firstName = profile.firstName;
         if (profile.lastName !== user.lastName) updates.lastName = profile.lastName;
         if (profile.bio !== user.bio) updates.bio = profile.bio;
+        if (profile.company !== user.company) updates.company = profile.company;
 
         if (newPassword) {
             if (newPassword !== confirmPassword) {
-                setPasswordError("Passwords do not match.");
-                return;
-            }
-            if (newPassword.length < 6) {
-                setPasswordError("Password must be at least 6 characters.");
+                alert("Passwords do not match.");
                 return;
             }
             updates.newPassword = newPassword;
         }
-        setPasswordError('');
-        onSave(updates);
+
+        onSaveUserProfile(updates);
+        setIsEditing(false);
     };
 
     return (
         <div className="p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
-                 <h1 className="text-3xl font-bold mb-8">My Profile</h1>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="md:col-span-1 flex flex-col items-center">
-                        <div className="w-32 h-32 rounded-full bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center ring-4 ring-pink-500">
-                             <UserCircleIcon className="w-24 h-24 text-pink-500"/>
+                <div className="flex justify-between items-center">
+                    <h1 className="text-3xl font-bold">My Profile</h1>
+                    {!isEditing ? (
+                        <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg"><EditIcon className="w-5 h-5"/> Edit Profile</button>
+                    ) : (
+                        <div className="flex gap-2">
+                             <button onClick={() => { setIsEditing(false); setProfile(user); }} className="bg-gray-200 dark:bg-gray-600 font-semibold px-4 py-2 rounded-lg">Cancel</button>
+                             <button onClick={handleSave} className="bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg">Save Changes</button>
                         </div>
-                        <h2 className="mt-4 text-2xl font-bold">{user.firstName} {user.lastName}</h2>
-                        <p className="text-gray-500 capitalize">{user.role}</p>
+                    )}
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="md:col-span-1 text-center bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                        <UserCircleIcon className="w-32 h-32 mx-auto text-pink-500" />
+                        <h2 className="text-2xl font-bold mt-4">{profile.firstName} {profile.lastName}</h2>
+                        <p className="text-pink-500 font-semibold capitalize">{profile.role}</p>
                     </div>
-                    <div className="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md space-y-6">
-                        <div>
-                            <h3 className="text-lg font-bold mb-2">Personal Information</h3>
+                    <div className="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                        <h3 className="text-xl font-bold mb-4">Personal Information</h3>
+                        <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="text" value={profile.firstName} onChange={e => setProfile({...profile, firstName: e.target.value})} className="w-full p-2 border rounded-md dark:bg-gray-700" />
-                                <input type="text" value={profile.lastName} onChange={e => setProfile({...profile, lastName: e.target.value})} className="w-full p-2 border rounded-md dark:bg-gray-700" />
+                                <div><label className="font-semibold">First Name</label><input type="text" value={profile.firstName} onChange={e => setProfile({...profile, firstName: e.target.value})} disabled={!isEditing} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-700/50" /></div>
+                                <div><label className="font-semibold">Last Name</label><input type="text" value={profile.lastName} onChange={e => setProfile({...profile, lastName: e.target.value})} disabled={!isEditing} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-700/50" /></div>
                             </div>
-                             <textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} placeholder="Your Bio" rows={3} className="w-full p-2 border rounded-md dark:bg-gray-700 mt-4" />
+                             <div><label className="font-semibold">Email</label><input type="email" value={profile.email} disabled className="w-full mt-1 p-2 border rounded bg-gray-100 dark:bg-gray-700/50" /></div>
+                             <div><label className="font-semibold">Company</label><input type="text" value={profile.company || ''} onChange={e => setProfile({...profile, company: e.target.value})} disabled={!isEditing} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-700/50" /></div>
+                             <div><label className="font-semibold">Bio</label><textarea value={profile.bio || ''} onChange={e => setProfile({...profile, bio: e.target.value})} disabled={!isEditing} rows={3} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-700/50" /></div>
                         </div>
-                         <div>
-                            <h3 className="text-lg font-bold mb-2">Change Password</h3>
-                             <div className="grid grid-cols-2 gap-4">
-                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New Password" className="w-full p-2 border rounded-md dark:bg-gray-700" />
-                                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm Password" className="w-full p-2 border rounded-md dark:bg-gray-700" />
+                        {isEditing && (
+                            <div className="mt-6 pt-6 border-t dark:border-gray-700">
+                                <h3 className="text-xl font-bold mb-4">Change Password</h3>
+                                <div className="space-y-4">
+                                    <input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700" />
+                                    <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700" />
+                                </div>
                             </div>
-                            {passwordError && <p className="text-red-500 text-sm mt-2">{passwordError}</p>}
-                        </div>
-                        <div className="text-right">
-                            <button onClick={handleSave} className="bg-pink-500 text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-pink-600">Save Changes</button>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1156,62 +1029,234 @@ const ProfilePage: React.FC<{ user: User, onSave: (updates: Partial<User> & { ne
 
 
 // ====================================================================================
-// ===== EXPORTED WRAPPER COMPONENT
+// ===== CALENDAR, HISTORY, SESSIONS, ANALYTICS (Placeholders or Simple Versions)
+// ====================================================================================
+const CalendarPage: React.FC<{ user: User, calendarEvents: CalendarEvent[] }> = ({ user, calendarEvents }) => {
+    // Basic list view of calendar events
+    return (
+        <div className="p-4 md:p-8">
+            <h1 className="text-3xl font-bold">My Calendar</h1>
+            <p className="text-gray-500 mt-1">Deadlines, assignments, and live sessions.</p>
+            <div className="mt-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                <ul className="space-y-4">
+                    {calendarEvents.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(event => (
+                        <li key={event.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex items-center gap-4">
+                            <div className="text-center w-16">
+                                <p className="font-bold text-pink-500 text-lg">{new Date(event.date).toLocaleDateString('en-US', { day: 'numeric' })}</p>
+                                <p className="text-sm">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold">{event.title}</p>
+                                <p className="text-sm text-gray-500 capitalize">{event.type.replace('_', ' ')}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+};
+
+const HistoryPage: React.FC<{ user: User, historyLogs: HistoryLog[] }> = ({ user, historyLogs }) => {
+    const actionIcons: Record<HistoryAction, React.ReactNode> = {
+        course_enrolled: <PlusCircleIcon className="w-5 h-5 text-blue-500" />,
+        lesson_completed: <CheckCircle2Icon className="w-5 h-5 text-green-500" />,
+        quiz_passed: <AwardIcon className="w-5 h-5 text-amber-500" />,
+        certificate_earned: <AwardIcon className="w-5 h-5 text-pink-500" />,
+        discussion_posted: <MessageSquareIcon className="w-5 h-5 text-purple-500" />,
+    };
+    return (
+        <div className="p-4 md:p-8">
+            <h1 className="text-3xl font-bold">My History</h1>
+            <p className="text-gray-500 mt-1">A log of your recent activity on the platform.</p>
+            <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+                <ul className="divide-y dark:divide-gray-700">
+                    {historyLogs.map(log => (
+                        <li key={log.id} className="p-4 flex items-center gap-4">
+                            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{actionIcons[log.action]}</div>
+                            <div className="flex-grow">
+                                <p><span className="font-semibold capitalize">{log.action.replace('_', ' ')}</span>: {log.targetName}</p>
+                            </div>
+                            <p className="text-sm text-gray-500">{new Date(log.timestamp).toLocaleString()}</p>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+};
+
+const LiveSessionsPage: React.FC<{ user: User, liveSessions: LiveSession[], onScheduleSession: (session: Omit<LiveSession, 'id'>) => Promise<void>, onDeleteSession: (id: string) => Promise<void> }> = ({ user, liveSessions, onScheduleSession, onDeleteSession }) => {
+    const [isScheduling, setIsScheduling] = useState(false);
+    
+    const SessionModal: React.FC = () => {
+        const [title, setTitle] = useState('');
+        const [dateTime, setDateTime] = useState('');
+        const [duration, setDuration] = useState(60);
+
+        const handleSchedule = () => {
+            const sessionData = {
+                title, 
+                description: '',
+                dateTime: new Date(dateTime).toISOString(),
+                duration,
+                instructorId: user.id,
+                audience: 'all' // Simplified for now
+            };
+            onScheduleSession(sessionData);
+            setIsScheduling(false);
+        };
+        return (
+             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-lg">
+                     <h2 className="text-xl font-bold mb-4">Schedule New Session</h2>
+                     <div className="space-y-4">
+                        <input type="text" placeholder="Session Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                        <input type="datetime-local" value={dateTime} onChange={e => setDateTime(e.target.value)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                        <input type="number" placeholder="Duration (minutes)" value={duration} onChange={e => setDuration(parseInt(e.target.value) || 60)} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                     </div>
+                     <div className="flex justify-end gap-2 mt-6">
+                        <button onClick={() => setIsScheduling(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg font-semibold">Cancel</button>
+                        <button onClick={handleSchedule} className="px-4 py-2 bg-pink-500 text-white rounded-lg font-semibold">Schedule</button>
+                     </div>
+                 </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="p-4 md:p-8">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold">Live Sessions</h1>
+                    <p className="text-gray-500 mt-1">Join upcoming live events or schedule new ones.</p>
+                </div>
+                {user.role !== Role.STUDENT && (
+                    <button onClick={() => setIsScheduling(true)} className="flex items-center gap-2 bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg"><PlusCircleIcon className="w-5 h-5"/> Schedule Session</button>
+                )}
+            </div>
+             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {liveSessions.map(session => (
+                    <div key={session.id} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                        <h3 className="text-lg font-bold">{session.title}</h3>
+                        <p className="text-sm text-gray-500">{new Date(session.dateTime).toLocaleString()}</p>
+                        <p className="mt-2 text-sm">Duration: {session.duration} minutes</p>
+                        <div className="flex justify-end mt-4 gap-2">
+                            {user.id === session.instructorId && <button onClick={() => onDeleteSession(session.id)} className="p-2 text-red-500"><Trash2Icon className="w-5 h-5"/></button>}
+                             <button className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg">Join Now</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {isScheduling && <SessionModal />}
+        </div>
+    )
+};
+
+const AnalyticsPage: React.FC<{ user: User, courses: Course[], enrollments: Enrollment[], allUsers: User[] }> = ({ user, courses, enrollments, allUsers }) => {
+    // Analytics are simplified for this component, re-using dashboard logic
+    const isInstructor = user.role === Role.INSTRUCTOR;
+    const instructorCourses = courses.filter(c => c.instructorId === user.id);
+    const instructorCourseIds = instructorCourses.map(c => c.id);
+    const instructorEnrollments = enrollments.filter(e => instructorCourseIds.includes(e.courseId));
+    
+    return (
+        <div className="p-4 md:p-8">
+            <h1 className="text-3xl font-bold">Analytics</h1>
+            <p className="text-gray-500 mt-1">Performance and engagement metrics.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+                {isInstructor ? (
+                    <>
+                        <StatCard icon={<UsersIcon className="w-8 h-8" />} value={new Set(instructorEnrollments.map(e => e.userId)).size} label="Total Students" color="from-cyan-500 to-blue-500" />
+                        <StatCard icon={<BookOpenIcon className="w-8 h-8" />} value={instructorCourses.length} label="Your Courses" color="from-pink-500 to-rose-500" />
+                        <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={`${Math.round(instructorEnrollments.reduce((a,b)=> a + b.progress, 0) / (instructorEnrollments.length || 1))}%`} label="Avg. Completion" color="from-amber-500 to-orange-500" />
+                    </>
+                ) : ( // Admin view
+                    <>
+                        <StatCard icon={<UsersIcon className="w-8 h-8" />} value={allUsers.length} label="Total Users" color="from-blue-600 to-violet-600" />
+                        <StatCard icon={<BookOpenIcon className="w-8 h-8" />} value={courses.length} label="Total Courses" color="from-pink-500 to-rose-500" />
+                        <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={enrollments.length.toLocaleString()} label="Total Enrollments" color="from-teal-400 to-cyan-600" />
+                    </>
+                )}
+            </div>
+             <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
+                    <h3 className="text-xl font-bold">Engagement Over Time</h3>
+                    <SimpleBarChart data={[{name: 'Jan', value: 120}, {name: 'Feb', value: 240}, {name: 'Mar', value: 180}, {name: 'Apr', value: 350}]} color="var(--brand-purple)" />
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
+                     <h3 className="text-xl font-bold">Popular Courses</h3>
+                     <SimpleBarChart data={courses.slice(0, 4).map(c => ({ name: c.title, value: enrollments.filter(e => e.courseId === c.id).length }))} color="var(--brand-pink)" />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// ====================================================================================
+// ===== 9. MAIN EXPORTED COMPONENT (The Router)
 // ====================================================================================
 
+// FIX: Renamed from ManagementPagesProps as it's the main props for the component.
 interface ManagementPagesProps {
-  view: Exclude<View, 'dashboard' | 'player'>;
+  // FIX: This type is now correctly imported.
+  // FIX: Allow 'course-editor' view. The component's props are set up to handle it, and App.tsx calls it with this view.
+  view: Exclude<View, 'player' | 'dashboard'>;
   user: User;
   courses: Course[];
   enrollments: Enrollment[];
   allUsers: User[];
-  courseToEdit?: Course | null;
-  onSave: (course: Course) => void;
-  onExit: () => void;
-  onEditCourse: (course: Course | null) => void;
-  onSelectCourse: (course: Course) => void;
   conversations: Conversation[];
   messages: Message[];
-  onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
-  onUpdateMessages: (messages: Message[]) => void;
   calendarEvents: CalendarEvent[];
   historyLogs: HistoryLog[];
   liveSessions: LiveSession[];
+  onSelectCourse: (course: Course) => void;
+  onEditCourse: (course: Course | null) => void;
+  courseToEdit?: Course | null; // For course editor
+  onSave?: (course: Course) => void; // For course editor
+  onExit?: () => void; // For course editor
+  onRefetchData: () => void;
+  onSendMessage: (recipientIds: string[], subject: string, content: string) => Promise<void>;
+  onUpdateMessages: (updatedMessages: Message[]) => void;
   onScheduleSession: (session: Omit<LiveSession, 'id'>) => Promise<void>;
   onDeleteSession: (sessionId: string) => Promise<void>;
-  onRefetchData: () => void;
   onSaveUserProfile: (updates: Partial<User> & { newPassword?: string }) => Promise<void>;
 }
 
-export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
-    switch (props.view) {
+
+// FIX: This component was missing its export statement.
+export const ManagementPages: React.FC<ManagementPagesProps> = ({ view, ...props }) => {
+    switch (view) {
         case 'certifications':
             return <CertificationsPage user={props.user} courses={props.courses} enrollments={props.enrollments} />;
         case 'my-courses':
             return <MyCoursesPage user={props.user} courses={props.courses} onEditCourse={props.onEditCourse} onSelectCourse={props.onSelectCourse} />;
-        case 'course-editor': // This case is handled in App.tsx but added for completeness
-             return props.courseToEdit !== undefined ? <CourseEditorPage course={props.courseToEdit} user={props.user} onSave={props.onSave} onExit={props.onExit} /> : <div>Error: No course selected for editing.</div>;
+        // FIX: The case for 'course-editor' was incorrectly removed. It is re-added here to match the logic in App.tsx.
+        case 'course-editor':
+           return <CourseEditorPage course={props.courseToEdit || null} user={props.user} onSave={props.onSave!} onExit={props.onExit!} />;
         case 'user-management':
-            return <UserManagementPage allUsers={props.allUsers} onRefetchData={props.onRefetchData} onSaveUserProfile={props.onSaveUserProfile}/>;
+            return <UserManagementPage allUsers={props.allUsers} onRefetchData={props.onRefetchData} onSaveUserProfile={props.onSaveUserProfile} />;
         case 'student-management':
-            return <StudentManagementPage user={props.user} courses={props.courses} enrollments={props.enrollments} allUsers={props.allUsers}/>;
+            return <StudentManagementPage user={props.user} courses={props.courses} enrollments={props.enrollments} allUsers={props.allUsers} />;
         case 'platform-settings':
             return <PlatformSettingsPage />;
         case 'inbox':
-            return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages}/>;
-        case 'calendar':
-            return <CalendarPage user={props.user} events={props.calendarEvents}/>
-        case 'history':
-            return <HistoryPage user={props.user} logs={props.historyLogs}/>
-        case 'live-sessions':
-            return <LiveSessionsPage user={props.user} liveSessions={props.liveSessions} courses={props.courses} onScheduleSession={props.onScheduleSession} onDeleteSession={props.onDeleteSession}/>;
+            return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} />;
         case 'profile':
-            return <ProfilePage user={props.user} onSave={props.onSaveUserProfile} />;
-        case 'help':
-            return <HelpPage user={props.user} />;
+            return <ProfilePage user={props.user} onSaveUserProfile={props.onSaveUserProfile} />;
+        case 'calendar':
+            return <CalendarPage user={props.user} calendarEvents={props.calendarEvents} />;
+        case 'history':
+            return <HistoryPage user={props.user} historyLogs={props.historyLogs} />;
+        case 'live-sessions':
+            return <LiveSessionsPage user={props.user} liveSessions={props.liveSessions} onScheduleSession={props.onScheduleSession} onDeleteSession={props.onDeleteSession} />;
         case 'analytics':
-             return <div className="p-8"><h1 className="text-2xl font-bold">Analytics Page (Under Construction)</h1></div>; // Placeholder
+             return <AnalyticsPage user={props.user} courses={props.courses} enrollments={props.enrollments} allUsers={props.allUsers} />;
+        case 'help':
+             return <HelpPage user={props.user} />;
         default:
-            return <div>Unknown view: {props.view}</div>;
+            return <div className="p-8"><h2>Unknown view: {view}</h2><p>Please select a page from the sidebar.</p></div>;
     }
 };
