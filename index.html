@@ -29,6 +29,31 @@
         color: #559bd4; /* Lighter blue for dark mode */
       }
 
+      /* --- Typography Overrides for Course Content --- */
+      /* By default, Tailwind's prose class uses a system font stack. This ensures it uses our chosen content font. */
+      .prose {
+        font-family: 'Source Sans Pro', sans-serif;
+      }
+
+      /* The `prose-lg` modifier used in the course player increases paragraph font size. 
+         This rule overrides it to match the user's request for 16px. */
+      .prose p {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1.7;
+      }
+
+      /* The prose plugin also overrides heading styles, so we re-apply our custom heading font for consistency. */
+      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+        font-family: 'Ultima Pro', 'Plus Jakarta Sans', sans-serif;
+        font-weight: 700;
+        color: var(--brand-blue);
+      }
+      .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+        color: #559bd4;
+      }
+
+
       /* --- Modern Table Styles --- */
       .prose table {
         width: 100%;

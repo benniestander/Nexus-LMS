@@ -856,6 +856,154 @@ const PlatformSettingsPage: React.FC<{}> = () => {
 // ====================================================================================
 // ===== 7. INBOX PAGE
 // ====================================================================================
+
+// A dedicated component for composing messages with role-based logic.
+const ComposeView: React.FC<{
+    user: User;
+    allUsers: User[];
+    courses: Course[];
+    enrollments: Enrollment[];
+    onSend: (recipientIds: string[], subject: string, content: string) => Promise<void>;
+    onCancel: () => void;
+}> = ({ user, allUsers, courses, enrollments, onSend, onCancel }) => {
+    const [subject, setSubject] = useState('');
+    const [content, setContent] = useState('');
+
+    // --- Logic for Instructors/Admins to select student recipients ---
+    const instructorCourses = useMemo(() => {
+        if (user.role === Role.ADMIN) return courses;
+        if (user.role === Role.INSTRUCTOR) return courses.filter(c => c.instructorId === user.id);
+        return [];
+    }, [user, courses]);
+
+    const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
+    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+    
+    const studentsForCourse = useMemo(() => {
+        const courseIds = selectedCourseId === 'all' 
+            ? instructorCourses.map(c => c.id) 
+            : [selectedCourseId];
+            
+        const studentIdsInCourses = new Set(
+            enrollments
+                .filter(e => courseIds.includes(e.courseId))
+                .map(e => e.userId)
+        );
+        
+        return allUsers.filter(u => u.role === Role.STUDENT && studentIdsInCourses.has(u.id));
+    }, [selectedCourseId, instructorCourses, enrollments, allUsers]);
+
+    useEffect(() => {
+        // Reset selected students when course filter changes
+        setSelectedStudentIds([]);
+    }, [selectedCourseId]);
+
+    const handleToggleStudent = (studentId: string) => {
+        setSelectedStudentIds(prev => 
+            prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
+        );
+    };
+
+    const handleToggleAllStudents = () => {
+        if (selectedStudentIds.length === studentsForCourse.length) {
+            setSelectedStudentIds([]);
+        } else {
+            setSelectedStudentIds(studentsForCourse.map(s => s.id));
+        }
+    };
+
+    // --- Logic for Students to select their instructor ---
+    const availableInstructors = useMemo(() => {
+        if (user.role !== Role.STUDENT) return [];
+        
+        const userEnrollments = enrollments.filter(e => e.userId === user.id);
+        const courseIds = userEnrollments.map(e => e.courseId);
+        const instructorIds = new Set(
+            courses
+                .filter(c => courseIds.includes(c.id))
+                .map(c => c.instructorId)
+        );
+
+        return allUsers.filter(u => instructorIds.has(u.id));
+    }, [user, enrollments, courses, allUsers]);
+
+    const [selectedInstructorId, setSelectedInstructorId] = useState<string>(availableInstructors[0]?.id || '');
+    
+    useEffect(() => {
+        if (user.role === Role.STUDENT && !selectedInstructorId && availableInstructors.length > 0) {
+            setSelectedInstructorId(availableInstructors[0].id);
+        }
+    }, [availableInstructors, user.role, selectedInstructorId]);
+
+    // --- Send Logic ---
+    const handleSend = async () => {
+        const recipientIds = user.role === Role.STUDENT 
+            ? (selectedInstructorId ? [selectedInstructorId] : [])
+            : selectedStudentIds;
+
+        if (recipientIds.length === 0 || !content.trim()) {
+            alert("Please select recipients and write a message.");
+            return;
+        }
+
+        await onSend(recipientIds, subject, content);
+    };
+
+    // Render Student View
+    if (user.role === Role.STUDENT) {
+        return (
+            <div className="p-4 flex flex-col h-full">
+                <h3 className="text-xl font-bold mb-4">New Message to Instructor</h3>
+                <select value={selectedInstructorId} onChange={e => setSelectedInstructorId(e.target.value)} className="w-full mt-2 p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                    <option value="" disabled>Select an instructor...</option>
+                    {availableInstructors.map(instructor => (
+                        <option key={instructor.id} value={instructor.id}>{instructor.firstName} {instructor.lastName}</option>
+                    ))}
+                </select>
+                <input type="text" placeholder="Subject (Optional)" value={subject} onChange={e => setSubject(e.target.value)} className="w-full mt-4 p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                <textarea placeholder="Your message..." value={content} onChange={e => setContent(e.target.value)} rows={10} className="w-full mt-2 p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 flex-grow" />
+                <div className="flex justify-end gap-2 mt-4">
+                    <button onClick={onCancel} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg font-semibold">Cancel</button>
+                    <button onClick={handleSend} disabled={!selectedInstructorId || !content.trim()} className="px-4 py-2 bg-pink-500 text-white rounded-lg font-semibold disabled:bg-gray-400">Send</button>
+                </div>
+            </div>
+        )
+    }
+
+    // Render Instructor/Admin View
+    return (
+        <div className="p-4 flex flex-col h-full">
+            <h3 className="text-xl font-bold mb-4">Broadcast Message to Students</h3>
+            <div className="flex gap-4 items-center">
+                <label className="font-semibold">Course:</label>
+                <select value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="flex-grow p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                    <option value="all">All My Students</option>
+                    {instructorCourses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                </select>
+            </div>
+            <div className="my-4 p-2 border rounded-lg dark:border-gray-600 h-48 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">
+                <div className="flex items-center gap-3 p-2 border-b dark:border-gray-600 sticky top-0 bg-gray-50 dark:bg-gray-900/50">
+                    <input type="checkbox" id="select-all" checked={selectedStudentIds.length === studentsForCourse.length && studentsForCourse.length > 0} onChange={handleToggleAllStudents} className="h-4 w-4 text-pink-600" />
+                    <label htmlFor="select-all" className="font-semibold">Select All ({selectedStudentIds.length}/{studentsForCourse.length})</label>
+                </div>
+                {studentsForCourse.map(student => (
+                    <div key={student.id} className="flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded">
+                        <input id={`student-${student.id}`} type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={() => handleToggleStudent(student.id)} className="h-4 w-4 text-pink-600" />
+                        <label htmlFor={`student-${student.id}`}>{student.firstName} {student.lastName}</label>
+                    </div>
+                ))}
+            </div>
+            <input type="text" placeholder="Subject (Optional)" value={subject} onChange={e => setSubject(e.target.value)} className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+            <textarea placeholder="Your message... (This will start a new, private conversation with each selected student)" value={content} onChange={e => setContent(e.target.value)} rows={6} className="w-full mt-2 p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+            <div className="flex justify-end gap-2 mt-4">
+                <button onClick={onCancel} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg font-semibold">Cancel</button>
+                <button onClick={handleSend} disabled={selectedStudentIds.length === 0 || !content.trim()} className="px-4 py-2 bg-pink-500 text-white rounded-lg font-semibold disabled:bg-gray-400">Send Message</button>
+            </div>
+        </div>
+    );
+};
+
+
 const InboxPage: React.FC<{ 
     user: User; 
     conversations: Conversation[];
@@ -863,7 +1011,9 @@ const InboxPage: React.FC<{
     allUsers: User[];
     onSendMessage: (recipientIds: string[], subject: string, content: string) => Promise<void>;
     onUpdateMessages: (updatedMessages: Message[]) => void;
-}> = ({ user, conversations, messages, allUsers, onSendMessage, onUpdateMessages }) => {
+    courses: Course[];
+    enrollments: Enrollment[];
+}> = ({ user, conversations, messages, allUsers, onSendMessage, onUpdateMessages, courses, enrollments }) => {
     
     const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
     const [isComposing, setIsComposing] = useState(false);
@@ -875,15 +1025,22 @@ const InboxPage: React.FC<{
             const convoMessages = messages.filter(m => m.conversationId === convo.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
             const lastMessage = convoMessages[0];
             const unreadCount = convoMessages.filter(m => !m.isRead && m.senderId !== user.id).length;
+            
+            // Only show conversations if the other participant exists and is not a student (if user is a student)
+            if (!otherParticipant) return null;
+            if (user.role === Role.STUDENT && otherParticipant.role === Role.STUDENT) return null;
+
             return {
                 ...convo,
-                otherParticipant: otherParticipant || { firstName: 'Unknown', lastName: 'User', id: 'unknown' },
+                otherParticipant: otherParticipant || { firstName: 'Unknown', lastName: 'User', id: 'unknown', role: Role.STUDENT, avatarUrl: '', bio: '', createdAt: '', email: '' },
                 lastMessage: lastMessage?.content || 'No messages yet.',
                 lastMessageTimestamp: lastMessage?.timestamp,
                 unreadCount
             };
-        }).sort((a,b) => new Date(b.lastMessageTimestamp || 0).getTime() - new Date(a.lastMessageTimestamp || 0).getTime());
-    }, [conversations, messages, allUsers, user.id]);
+        })
+        .filter(Boolean) // Remove nulls
+        .sort((a,b) => new Date(b!.lastMessageTimestamp || 0).getTime() - new Date(a!.lastMessageTimestamp || 0).getTime()) as (NonNullable<ReturnType<typeof enrichedConversations[0]>>)[]
+    }, [conversations, messages, allUsers, user.id, user.role]);
 
     const selectedConversationMessages = useMemo(() => {
         if (!selectedConvoId) return [];
@@ -906,33 +1063,12 @@ const InboxPage: React.FC<{
             .neq('sender_id', user.id)
             .then(({ error }) => { if (error) console.error("Error marking messages as read:", error); });
     };
-
-    const ComposeMessage: React.FC = () => {
-        const [recipient, setRecipient] = useState('');
-        const [subject, setSubject] = useState('');
-        const [content, setContent] = useState('');
-
-        const handleSend = async () => {
-            const recipientUser = allUsers.find(u => u.email === recipient);
-            if (!recipientUser) {
-                alert("Recipient not found");
-                return;
-            }
-            await onSendMessage([recipientUser.id], subject, content);
-            setIsComposing(false);
-        };
-        
-        return (
-            <div className="p-4">
-                 <h3 className="text-xl font-bold">New Message</h3>
-                 <input type="email" placeholder="Recipient Email" value={recipient} onChange={e => setRecipient(e.target.value)} className="w-full mt-4 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
-                 <input type="text" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} className="w-full mt-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
-                 <textarea placeholder="Your message..." value={content} onChange={e => setContent(e.target.value)} rows={10} className="w-full mt-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
-                 <button onClick={handleSend} className="mt-4 bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg">Send</button>
-            </div>
-        )
-    };
     
+    const handleSendMessageAndClose = async (recipientIds: string[], subject: string, content: string) => {
+        await onSendMessage(recipientIds, subject, content);
+        setIsComposing(false);
+    };
+
     const ConversationView: React.FC<{ convo: typeof enrichedConversations[0] }> = ({ convo }) => {
         const [reply, setReply] = useState('');
         const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -952,13 +1088,12 @@ const InboxPage: React.FC<{
                 <div className="flex-grow p-4 overflow-y-auto space-y-4">
                     {selectedConversationMessages.map(msg => {
                         const isSender = msg.senderId === user.id;
-                        const sender = isSender ? user : convo.otherParticipant;
                         return (
                             <div key={msg.id} className={`flex gap-3 ${isSender ? 'flex-row-reverse' : ''}`}>
                                 <UserCircleIcon className="w-8 h-8 text-gray-400 flex-shrink-0" />
                                 <div className={`p-3 rounded-lg max-w-md ${isSender ? 'bg-pink-500 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}>
                                     <p>{msg.content}</p>
-                                    <p className={`text-xs mt-2 ${isSender ? 'text-white/70' : 'text-gray-500'}`}>{new Date(msg.timestamp).toLocaleTimeString()}</p>
+                                    <p className={`text-xs mt-2 ${isSender ? 'text-white/70' : 'text-gray-500'}`}>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
                             </div>
                         )
@@ -966,8 +1101,8 @@ const InboxPage: React.FC<{
                     <div ref={messagesEndRef} />
                 </div>
                 <div className="p-4 border-t dark:border-gray-700 flex gap-2 flex-shrink-0">
-                    <input type="text" placeholder="Type your reply..." value={reply} onChange={e => setReply(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleReply()} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
-                    <button onClick={handleReply} className="bg-pink-500 text-white p-2 rounded-lg"><SendIcon className="w-5 h-5"/></button>
+                    <input type="text" placeholder="Type your reply..." value={reply} onChange={e => setReply(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleReply()} className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                    <button onClick={handleReply} className="bg-pink-500 text-white p-2.5 rounded-lg hover:bg-pink-600 transition-colors"><SendIcon className="w-5 h-5"/></button>
                 </div>
             </div>
         );
@@ -976,11 +1111,13 @@ const InboxPage: React.FC<{
     const selectedConvo = enrichedConversations.find(c => c.id === selectedConvoId);
 
     return (
-        <div className="h-full flex">
-            <div className="w-1/3 border-r dark:border-gray-700 flex flex-col">
-                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+        <div className="h-full flex bg-white dark:bg-gray-800">
+            <div className="w-full md:w-1/3 border-r dark:border-gray-700 flex flex-col">
+                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center flex-shrink-0">
                     <h2 className="text-xl font-bold">Inbox</h2>
-                    <button onClick={() => setIsComposing(true)} className="p-2 text-pink-500 hover:bg-pink-100 rounded-full"><EditIcon className="w-6 h-6"/></button>
+                    <button onClick={() => { setIsComposing(true); setSelectedConvoId(null); }} className="p-2 text-pink-500 hover:bg-pink-100 dark:hover:bg-pink-900/50 rounded-full" aria-label="New Message">
+                        <EditIcon className="w-6 h-6"/>
+                    </button>
                 </div>
                 <div className="overflow-y-auto">
                     {enrichedConversations.map(convo => (
@@ -989,15 +1126,30 @@ const InboxPage: React.FC<{
                                 <p className="font-semibold">{convo.otherParticipant.firstName} {convo.otherParticipant.lastName}</p>
                                 {convo.unreadCount > 0 && <span className="text-xs font-bold bg-pink-500 text-white rounded-full px-2 py-0.5">{convo.unreadCount}</span>}
                             </div>
-                            <p className="text-sm text-gray-500 truncate">{convo.lastMessage}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{convo.lastMessage}</p>
                         </div>
                     ))}
                 </div>
             </div>
-            <div className="w-2/3">
-                {isComposing ? <ComposeMessage /> : selectedConvo ? <ConversationView convo={selectedConvo} /> : 
-                <div className="h-full flex items-center justify-center text-gray-500">Select a conversation or compose a new message.</div>
-                }
+            <div className="hidden md:block w-2/3">
+                {isComposing ? (
+                    <ComposeView 
+                        user={user}
+                        allUsers={allUsers}
+                        courses={courses}
+                        enrollments={enrollments}
+                        onSend={handleSendMessageAndClose}
+                        onCancel={() => setIsComposing(false)}
+                    />
+                ) : selectedConvo ? (
+                    <ConversationView convo={selectedConvo} />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400 p-4">
+                        <MailIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+                        <h3 className="text-xl font-semibold">Welcome to your Inbox</h3>
+                        <p>Select a conversation from the list or start a new one.</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1251,10 +1403,7 @@ const AnalyticsPage: React.FC<{ user: User, courses: Course[], enrollments: Enro
 // ===== 9. MAIN EXPORTED COMPONENT (The Router)
 // ====================================================================================
 
-// FIX: Renamed from ManagementPagesProps as it's the main props for the component.
 interface ManagementPagesProps {
-  // FIX: This type is now correctly imported.
-  // FIX: Allow 'course-editor' view. The component's props are set up to handle it, and App.tsx calls it with this view.
   view: Exclude<View, 'player' | 'dashboard'>;
   user: User;
   courses: Course[];
@@ -1267,9 +1416,9 @@ interface ManagementPagesProps {
   liveSessions: LiveSession[];
   onSelectCourse: (course: Course) => void;
   onEditCourse: (course: Course | null) => void;
-  courseToEdit?: Course | null; // For course editor
-  onSave?: (course: Course) => void; // For course editor
-  onExit?: () => void; // For course editor
+  courseToEdit?: Course | null; 
+  onSave?: (course: Course) => void; 
+  onExit?: () => void; 
   onRefetchData: () => void;
   onSendMessage: (recipientIds: string[], subject: string, content: string) => Promise<void>;
   onUpdateMessages: (updatedMessages: Message[]) => void;
@@ -1279,14 +1428,12 @@ interface ManagementPagesProps {
 }
 
 
-// FIX: This component was missing its export statement.
 export const ManagementPages: React.FC<ManagementPagesProps> = ({ view, ...props }) => {
     switch (view) {
         case 'certifications':
             return <CertificationsPage user={props.user} courses={props.courses} enrollments={props.enrollments} />;
         case 'my-courses':
             return <MyCoursesPage user={props.user} courses={props.courses} onEditCourse={props.onEditCourse} onSelectCourse={props.onSelectCourse} />;
-        // FIX: The case for 'course-editor' was incorrectly removed. It is re-added here to match the logic in App.tsx.
         case 'course-editor':
            return <CourseEditorPage course={props.courseToEdit || null} user={props.user} onSave={props.onSave!} onExit={props.onExit!} />;
         case 'user-management':
@@ -1296,7 +1443,16 @@ export const ManagementPages: React.FC<ManagementPagesProps> = ({ view, ...props
         case 'platform-settings':
             return <PlatformSettingsPage />;
         case 'inbox':
-            return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} />;
+            return <InboxPage 
+                user={props.user} 
+                conversations={props.conversations} 
+                messages={props.messages} 
+                allUsers={props.allUsers} 
+                onSendMessage={props.onSendMessage} 
+                onUpdateMessages={props.onUpdateMessages}
+                courses={props.courses}
+                enrollments={props.enrollments}
+            />;
         case 'profile':
             return <ProfilePage user={props.user} onSaveUserProfile={props.onSaveUserProfile} />;
         case 'calendar':
