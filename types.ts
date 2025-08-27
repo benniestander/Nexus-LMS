@@ -1,4 +1,5 @@
 
+
 export enum Role {
   STUDENT = 'student',
   INSTRUCTOR = 'instructor',
@@ -133,6 +134,7 @@ export interface CalendarEvent {
   title: string;
   courseId?: string;
   type: 'deadline' | 'live_session' | 'assignment';
+  liveSessionId?: string;
 }
 
 // For History Page

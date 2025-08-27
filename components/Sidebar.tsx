@@ -24,6 +24,7 @@ export type View =
 
 interface SidebarProps {
   userRole: Role;
+  viewAsRole: Role;
   // FIX: Excluded 'course-editor' from direct navigation, consistent with 'player'.
   onNavigate: (view: Exclude<View, 'player' | 'course-editor'>) => void;
   currentView: View;
@@ -45,7 +46,7 @@ const NavItem: React.FC<{ icon: React.ReactElement<IconProps>; label: string; ac
   </li>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentView, isMobileMenuOpen, closeMenu, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNavigate, currentView, isMobileMenuOpen, closeMenu, onLogout }) => {
 
   const navItems = {
     [Role.STUDENT]: [
@@ -88,7 +89,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
   ];
 
   const getNavItems = () => {
-    return navItems[userRole] || [];
+    // Display navigation based on the role the user is currently viewing as.
+    return navItems[viewAsRole] || [];
   }
 
   const handleLogoutClick = () => {
@@ -96,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
     onLogout();
   };
   
-  const logoUrl = "https://i.postimg.cc/fk4m044D/Nexus-logo.jpg";
+  const logoUrl = "https://i.imgur.com/2yZtpe2.png";
 
   const handleNavigateClick = (view: Exclude<View, 'player' | 'course-editor'>) => {
     onNavigate(view);
@@ -109,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
     <aside className={`fixed inset-y-0 left-0 md:relative md:translate-x-0 w-64 bg-white dark:bg-gray-800 h-full flex flex-col z-50 transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between h-20 px-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <a href="#" onClick={(e) => { e.preventDefault(); handleNavigateClick('dashboard'); }} className="flex items-center gap-2">
-            <img src={logoUrl} alt="Nexus by Intersect Logo" className="h-20" />
+            <img src={logoUrl} alt="Nexus by Intersect Logo" className="h-12" />
         </a>
         <button onClick={closeMenu} className="md:hidden p-2 text-gray-500 dark:text-gray-400">
             <XIcon className="w-6 h-6" />

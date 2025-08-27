@@ -1,28 +1,52 @@
-
-
 import React, { useState } from 'react';
 import { User, Role } from '../types';
-import { ChevronDownIcon, UserCircleIcon, SettingsIcon, BellIcon, LogOutIcon, MenuIcon } from './Icons';
+import { ChevronDownIcon, UserCircleIcon, SettingsIcon, BellIcon, LogOutIcon } from './Icons';
 
 interface HeaderProps {
   user: User;
+  viewAsRole: Role;
+  onSetViewAsRole: (role: Role) => void;
   onLogout: () => void;
-  onToggleMobileMenu: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleMobileMenu }) => {
+const RoleSelector: React.FC<{ user: User, viewAsRole: Role, onSetViewAsRole: (role: Role) => void }> = ({ user, viewAsRole, onSetViewAsRole }) => {
+    // Only admins and instructors can switch roles.
+    if (user.role === Role.STUDENT) {
+        return null;
+    }
+
+    const availableRoles = {
+        [Role.ADMIN]: [Role.ADMIN, Role.INSTRUCTOR, Role.STUDENT],
+        [Role.INSTRUCTOR]: [Role.INSTRUCTOR, Role.STUDENT],
+        [Role.STUDENT]: [],
+    };
+
+    const rolesToDisplay = availableRoles[user.role];
+
+    return (
+        <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">View as:</span>
+            <select
+                value={viewAsRole}
+                onChange={(e) => onSetViewAsRole(e.target.value as Role)}
+                className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm font-semibold focus:ring-pink-500 focus:border-pink-500 capitalize"
+            >
+                {rolesToDisplay.map(role => (
+                    <option key={role} value={role} className="capitalize">{role.charAt(0).toUpperCase() + role.slice(1)}</option>
+                ))}
+            </select>
+        </div>
+    );
+};
+
+
+export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRole, onLogout }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 h-20 flex items-center justify-between z-30 sticky top-0">
-      <div className="flex items-center gap-2">
-         <button 
-            onClick={onToggleMobileMenu}
-            className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 md:hidden"
-            aria-label="Open menu"
-          >
-            <MenuIcon className="w-6 h-6" />
-        </button>
+      <div className="flex items-center gap-8">
+        <RoleSelector user={user} viewAsRole={viewAsRole} onSetViewAsRole={onSetViewAsRole} />
       </div>
       <div className="flex items-center gap-4">
         <button className="relative text-gray-500 dark:text-gray-400 hover:text-pink-500 transition-colors">

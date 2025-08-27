@@ -1,5 +1,3 @@
-
-
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
 
@@ -57,7 +55,7 @@ export const getInitialData = async (user: User) => {
             historyLogsRes,
             liveSessionsRes
         ] = await Promise.all([
-            supabase.from('courses').select('*, instructor:instructor_id (first_name, last_name)'),
+            supabase.from('courses').select('*, instructor:instructor_id(first_name, last_name)'),
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
             supabase.from('enrollments').select('*'),
@@ -127,7 +125,7 @@ export const getInitialData = async (user: User) => {
 export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]> => {
     const { data, error } = await supabase
         .from('discussion_posts')
-        .select(`*, author:author_id (id, first_name, last_name, avatar_url)`)
+        .select(`*, author:author_id(id, first_name, last_name, avatar_url)`)
         .eq('lesson_id', lessonId)
         .is('parent_post_id', null) // Fetch only top-level posts
         .order('timestamp', { ascending: false });
@@ -183,7 +181,7 @@ export const postDiscussion = async (post: { lessonId: string; authorId: string;
     const { data, error } = await supabase
         .from('discussion_posts')
         .insert({ lesson_id: lessonId, author_id: authorId, content })
-        .select(`*, author:author_id (id, first_name, last_name, avatar_url)`)
+        .select(`*, author:author_id(id, first_name, last_name, avatar_url)`)
         .single();
     
     if (error) {
@@ -323,16 +321,30 @@ export const scheduleSession = async (session: Omit<LiveSession, 'id'>) => {
         console.error("Error scheduling session:", error);
         return null;
     }
+    const newSession = snakeToCamel(data);
 
     // Also create a calendar event for it
     const newCalendarEvent = {
-        user_id: session.instructorId,
+        user_id: session.instructorId, // This might need adjustment if students should see it too
         date: session.dateTime.split('T')[0],
-        title: session.title,
+        title: `Live: ${session.title}`,
         course_id: session.audience !== 'all' ? session.audience : undefined,
         type: 'live_session',
+        live_session_id: newSession.id,
     };
     await supabase.from('calendar_events').insert(newCalendarEvent);
 
-    return snakeToCamel(data);
+    return newSession;
+}
+
+export const deleteSession = async (sessionId: string) => {
+    // Also delete the associated calendar event
+    await supabase.from('calendar_events').delete().match({ live_session_id: sessionId });
+    
+    const { error } = await supabase.from('live_sessions').delete().match({ id: sessionId });
+    if (error) {
+        console.error("Error deleting session:", error);
+        return { success: false, error };
+    }
+    return { success: true };
 }

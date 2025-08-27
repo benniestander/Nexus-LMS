@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect, useReducer } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
@@ -67,6 +65,7 @@ const App: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [viewAsRole, setViewAsRole] = useState<Role | null>(null);
 
   const loadAppData = useCallback(async (user: User) => {
       try {
@@ -100,6 +99,7 @@ const App: React.FC = () => {
           if (userProfile) {
             await loadAppData(userProfile);
             authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
+            setViewAsRole(userProfile.role); // Set initial role for "View as"
           } else {
             console.error("User is authenticated but has no profile. Signing out.");
             await supabase.auth.signOut();
@@ -123,6 +123,7 @@ const App: React.FC = () => {
       // If the user logs out and there was previously a user session.
       if (event === 'SIGNED_OUT' && authState.status === 'AUTHENTICATED') {
         authDispatch({ type: 'LOGOUT' });
+        setViewAsRole(null);
       }
       // If a user signs in after the initial load (e.g., in another tab).
       // A full reload is the most reliable way to ensure a clean state.
@@ -138,6 +139,11 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+  
+  const handleSetViewAsRole = (role: Role) => {
+      setViewAsRole(role);
+      setCurrentView('dashboard'); // Reset to dashboard on role change
   };
 
   const refetchData = useCallback(async () => {
@@ -265,6 +271,11 @@ const App: React.FC = () => {
     refetchData(); // Re-fetch to get new session and calendar event
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    await api.deleteSession(sessionId);
+    refetchData();
+  };
+
   const getEnrollmentForCourse = (courseId: string): Enrollment => {
       if (!authState.user) throw new Error("User not logged in");
       const existingEnrollment = enrollments.find(e => e.courseId === courseId && e.userId === authState.user!.id);
@@ -283,7 +294,7 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!authState.user) return null;
+    if (!authState.user || !viewAsRole) return null;
 
     if (currentView === 'course-editor') {
         return (
@@ -305,6 +316,7 @@ const App: React.FC = () => {
                 onSendMessage={handleSendMessage}
                 onUpdateMessages={handleUpdateMessages}
                 onScheduleSession={handleScheduleSession}
+                onDeleteSession={handleDeleteSession}
                 onEditCourse={handleEditCourse}
                 onSelectCourse={handleSelectCourse}
                 onSaveUserProfile={handleSaveUserProfile}
@@ -328,8 +340,10 @@ const App: React.FC = () => {
         return (
              <StudentDashboard
               user={authState.user}
+              viewAsRole={viewAsRole}
               courses={courses}
-              enrollments={enrollments.filter(e => e.userId === authState.user!.id)}
+              enrollments={enrollments}
+              allUsers={allUsers}
               onSelectCourse={handleSelectCourse}
               onNavigate={handleNavigate}
               onEditCourse={handleEditCourse}
@@ -354,6 +368,7 @@ const App: React.FC = () => {
             historyLogs={historyLogs}
             liveSessions={liveSessions}
             onScheduleSession={handleScheduleSession}
+            onDeleteSession={handleDeleteSession}
             onRefetchData={refetchData}
             onSave={handleSaveCourse}
             onExit={handleExitCourseEditor}
@@ -386,14 +401,14 @@ const App: React.FC = () => {
       );
 
     case 'AUTHENTICATED':
-      if (!authState.user) {
-         // This case should ideally not be reached if the state is managed correctly, but it's a good safeguard.
-         return <div>Error: User authenticated but no user data found.</div>
+      if (!authState.user || !viewAsRole) {
+         return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"><div className="bg-purple-600 text-white font-semibold px-6 py-3 rounded-lg">Loading Nexus...</div></div>;
       }
       return (
         <div className="min-h-screen flex">
           <Sidebar 
             userRole={authState.user.role} 
+            viewAsRole={viewAsRole}
             onNavigate={handleNavigate} 
             currentView={currentView} 
             isMobileMenuOpen={isMobileMenuOpen}
@@ -408,8 +423,13 @@ const App: React.FC = () => {
             ></div>
           )}
           <div className="flex-1 flex flex-col">
-            <Header user={authState.user} onLogout={handleLogout} onToggleMobileMenu={handleToggleMobileMenu} />
-            <main className="flex-1 overflow-y-auto h-[calc(100vh-80px)]">
+            <Header 
+                user={authState.user} 
+                viewAsRole={viewAsRole} 
+                onSetViewAsRole={handleSetViewAsRole} 
+                onLogout={handleLogout} 
+            />
+            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 h-[calc(100vh-80px)]">
               {renderContent()}
             </main>
           </div>

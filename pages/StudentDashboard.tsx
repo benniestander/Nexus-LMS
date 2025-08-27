@@ -231,22 +231,23 @@ const AdminDashboard: React.FC<{ user: User, courses: Course[], enrollments: Enr
 
 interface DashboardProps {
   user: User;
+  viewAsRole: Role; // Added to determine which dashboard to show
   courses: Course[];
   enrollments: Enrollment[];
+  allUsers: User[];
   onSelectCourse: (course: Course) => void;
   onNavigate: (view: any) => void;
   onEditCourse: (course: Course) => void;
 }
 
-export const StudentDashboard: React.FC<DashboardProps> = ({ user, courses, enrollments, onSelectCourse, onNavigate, onEditCourse }) => {
-  const allEnrollments = (window as any).__ALL_ENROLLMENTS__ || [];
-  const allUsers = (window as any).__ALL_USERS__ || [];
-
-  if (user.role === Role.INSTRUCTOR) {
-    return <InstructorDashboard user={user} courses={courses} enrollments={allEnrollments} onNavigate={onNavigate} onEditCourse={onEditCourse} />;
+export const StudentDashboard: React.FC<DashboardProps> = ({ user, viewAsRole, courses, enrollments, allUsers, onSelectCourse, onNavigate, onEditCourse }) => {
+  if (viewAsRole === Role.INSTRUCTOR) {
+    return <InstructorDashboard user={user} courses={courses} enrollments={enrollments} onNavigate={onNavigate} onEditCourse={onEditCourse} />;
   }
-  if (user.role === Role.ADMIN) {
-    return <AdminDashboard user={user} courses={courses} enrollments={allEnrollments} allUsers={allUsers} />;
+  if (viewAsRole === Role.ADMIN) {
+    return <AdminDashboard user={user} courses={courses} enrollments={enrollments} allUsers={allUsers} />;
   }
-  return <StudentDashboardComponent user={user} courses={courses} enrollments={enrollments} onSelectCourse={onSelectCourse} />;
+  
+  const userEnrollments = enrollments.filter(e => e.userId === user.id);
+  return <StudentDashboardComponent user={user} courses={courses} enrollments={userEnrollments} onSelectCourse={onSelectCourse} />;
 };

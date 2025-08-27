@@ -275,7 +275,40 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     }
   };
 
-  const handleSendMessage = async (message: string) => { /* ... same as original ... */ };
+  const handleSendMessage = async (message:string) => {
+    setIsBotReplying(true);
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message };
+    setChatHistory(prev => [...prev, userMessage]);
+
+    try {
+        const model = 'gemini-2.5-flash';
+        const systemInstruction = `You are Nicky, an expert AI learning partner embedded in the Nexus LMS. 
+        Your goal is to help students understand the course material better.
+        The user is currently on the lesson titled "${currentLesson?.title}" within the course "${course.title}".
+        Keep your answers concise, helpful, and encouraging. Do not go off-topic.
+        Base your answer on the provided context if possible, but you can use general knowledge to explain concepts.`;
+        
+        const prompt = `Based on the lesson "${currentLesson?.title}", help me with this: ${message}`;
+        
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                systemInstruction,
+            }
+        });
+
+        const botResponse: ChatMessage = { id: crypto.randomUUID(), role: 'bot', content: response.text };
+        setChatHistory(prev => [...prev, botResponse]);
+
+    } catch (error) {
+        console.error("Error calling Gemini API:", error);
+        const errorResponse: ChatMessage = { id: crypto.randomUUID(), role: 'bot', content: "Sorry, I'm having trouble connecting right now. Please try again later." };
+        setChatHistory(prev => [...prev, errorResponse]);
+    } finally {
+        setIsBotReplying(false);
+    }
+};
 
   useEffect(() => {
     if (sidebarTab === 'chatbot' && chatHistory.length === 0) {

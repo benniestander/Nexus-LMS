@@ -50,7 +50,7 @@ export const Auth: React.FC = () => {
     <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-            <img src="https://i.postimg.cc/fk4m044D/Nexus-logo.jpg" alt="Nexus Logo" className="w-48 mx-auto" />
+            <img src="https://i.imgur.com/2yZtpe2.png" alt="Nexus Logo" className="w-40 mx-auto" />
             <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-300 mt-4">Welcome to Nexus</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">Sign in to continue your learning journey.</p>
         </div>
