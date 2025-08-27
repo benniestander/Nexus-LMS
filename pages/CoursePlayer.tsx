@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
@@ -185,6 +186,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isPlayerSidebarOpen, setIsPlayerSidebarOpen] = useState(false);
   
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
   const isCurrentLessonComplete = currentLesson ? enrollment.completedLessonIds.includes(currentLesson.id) : false;
@@ -338,7 +340,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
               </div>
           </div>
           
-          <div className="flex-grow overflow-y-auto p-4 sm:px-8 sm:py-6">
+          <div className="flex-grow overflow-y-auto px-4 sm:px-8 py-12">
               {playerView === 'quiz_result' && lastQuizResult ? (
                  <QuizResult 
                     result={lastQuizResult} 
@@ -349,9 +351,9 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                 <div className="w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
                   <iframe 
                     className="w-full h-full" 
-                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0`} 
+                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0&origin=${origin}`} 
                     title={currentLesson.title} 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
                 </div>
