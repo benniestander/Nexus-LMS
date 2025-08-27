@@ -186,7 +186,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isPlayerSidebarOpen, setIsPlayerSidebarOpen] = useState(false);
   
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
   const isCurrentLessonComplete = currentLesson ? enrollment.completedLessonIds.includes(currentLesson.id) : false;
@@ -340,7 +339,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
               </div>
           </div>
           
-          <div className="flex-grow overflow-y-auto px-4 sm:px-8 py-12">
+          <div className="flex-grow overflow-y-auto px-4 sm:px-8 py-10">
               {playerView === 'quiz_result' && lastQuizResult ? (
                  <QuizResult 
                     result={lastQuizResult} 
@@ -351,9 +350,9 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                 <div className="w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
                   <iframe 
                     className="w-full h-full" 
-                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0&origin=${origin}`} 
+                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0`} 
                     title={currentLesson.title} 
-                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
                 </div>
