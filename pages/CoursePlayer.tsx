@@ -1,10 +1,8 @@
 
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
-import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon } from '../components/Icons';
+import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, UserCircleIcon } from '../components/Icons';
 import { GoogleGenAI } from "@google/genai";
 import * as api from '../supabaseApi';
 
@@ -122,7 +120,9 @@ const DiscussionView: React.FC<{ lessonId: string, user: User }> = ({ lessonId, 
                     posts.map(post => (
                         <div key={post.id} className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
                             <div className="flex items-start gap-3">
-                                <img src={post.author.avatar} alt={post.author.firstName} className="w-8 h-8 rounded-full" />
+                                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                                    <UserCircleIcon className="w-6 h-6 text-gray-500" />
+                                </div>
                                 <div>
                                     <p className="font-semibold text-sm">{post.author.firstName} {post.author.lastName}</p>
                                     <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
@@ -154,7 +154,7 @@ const ChatbotView: React.FC<{ messages: ChatMessage[]; onSendMessage: (message: 
                  <div className="p-1.5 bg-pink-100 dark:bg-pink-900/50 rounded-full"><PlayCircleIcon className="w-7 h-7 text-pink-500" /></div>
                  <div><h3 className="text-lg font-bold text-blue-700 dark:text-blue-300">Nicky</h3><p className="text-sm text-gray-500 dark:text-gray-400">Your AI learning partner</p></div>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto space-y-5">{messages.map((message) => (<div key={message.id} className={`flex items-end gap-2.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>{message.role === 'bot' && ( <PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /> )}<div className={`max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl ${message.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}><p className="text-sm">{message.content}</p></div>{message.role === 'user' && ( <img src={user.avatar} alt="You" className="w-7 h-7 rounded-full flex-shrink-0" /> )}</div>))}{isBotReplying && (<div className="flex items-end gap-2.5 justify-start"><PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /><div className="max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-none"><div className="flex items-center gap-2"><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce"></span></div></div></div>)}<div ref={messagesEndRef} /></div>
+            <div className="flex-grow p-4 overflow-y-auto space-y-5">{messages.map((message) => (<div key={message.id} className={`flex items-end gap-2.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>{message.role === 'bot' && ( <PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /> )}<div className={`max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl ${message.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}><p className="text-sm">{message.content}</p></div>{message.role === 'user' && ( <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0"><UserCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" /></div> )}</div>))}{isBotReplying && (<div className="flex items-end gap-2.5 justify-start"><PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /><div className="max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-none"><div className="flex items-center gap-2"><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce"></span></div></div></div>)}<div ref={messagesEndRef} /></div>
             <form onSubmit={handleSend} className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2.5 flex-shrink-0"><input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask Nicky anything..." className="flex-grow p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-pink-500" disabled={isBotReplying} /><button type="submit" className="bg-pink-500 text-white p-2.5 rounded-lg hover:bg-pink-600 disabled:bg-gray-400" disabled={!input.trim() || isBotReplying}><SendIcon className="w-5 h-5" /></button></form>
         </div>
     );

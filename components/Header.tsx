@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { ChevronDownIcon, UserCircleIcon, SettingsIcon, BellIcon, LogOutIcon, MenuIcon } from './Icons';
@@ -37,7 +38,9 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleMobileMe
             className="flex items-center space-x-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full py-1 pr-3 pl-1 transition-colors"
             onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
           >
-            <img src={user.avatar} alt="User Avatar" className="w-10 h-10 rounded-full border-2 border-pink-500" />
+            <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center">
+              <UserCircleIcon className="w-8 h-8 text-pink-500" />
+            </div>
             <div className="text-left hidden md:block">
               <p className="text-sm font-semibold text-gray-800 dark:text-white">{user.firstName} {user.lastName}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>

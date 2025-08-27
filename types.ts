@@ -11,7 +11,7 @@ export interface User {
   lastName: string;
   email: string;
   role: Role;
-  avatar: string;
+  avatarUrl: string;
   bio: string;
   company?: string;
   createdAt: string;
@@ -97,7 +97,7 @@ export interface ChatMessage {
 export interface DiscussionPost {
     id: string;
     lessonId: string;
-    author: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'>;
+    author: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatarUrl'>;
     content: string;
     timestamp: string;
     replies: DiscussionPost[];

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
@@ -55,7 +57,7 @@ const App: React.FC = () => {
         setSession(session);
 
         if (session) {
-            const userProfile = await api.getProfile(session.user.id, session.user.email!);
+            const userProfile = await api.getProfile(session.user.id);
             setCurrentUser(userProfile);
             if(userProfile) {
               await loadAppData(userProfile);
@@ -72,7 +74,7 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-        const userProfile = await api.getProfile(session.user.id, session.user.email!);
+        const userProfile = await api.getProfile(session.user.id);
         setCurrentUser(userProfile);
         if(userProfile) {
             await loadAppData(userProfile);
@@ -209,13 +211,22 @@ const App: React.FC = () => {
 
     if (editingCourse) {
         return (
+            // FIX: Added missing props to ManagementPages component.
             <ManagementPages
                 view="course-editor"
                 user={currentUser}
                 courseToEdit={editingCourse}
                 onSave={handleSaveCourse}
                 onExit={handleExitCourseEditor}
-                courses={courses} enrollments={enrollments} allUsers={allUsers}
+                courses={courses}
+                enrollments={enrollments}
+                allUsers={allUsers}
+                conversations={conversations}
+                messages={messages}
+                calendarEvents={calendarEvents}
+                historyLogs={historyLogs}
+                liveSessions={liveSessions}
+                onRefetchData={refetchData}
             />
         );
     }
@@ -262,6 +273,7 @@ const App: React.FC = () => {
             historyLogs={historyLogs}
             liveSessions={liveSessions}
             onScheduleSession={handleScheduleSession}
+            onRefetchData={refetchData}
         />
     )
   }

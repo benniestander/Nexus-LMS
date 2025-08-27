@@ -27,9 +27,9 @@ export const snakeToCamel = (obj: any): any => {
 // ===== DATA FETCHING API
 // ====================================================================================
 
-export const getProfile = async (userId: string, email: string): Promise<User | null> => {
+export const getProfile = async (userId: string): Promise<User | null> => {
     const { data, error } = await supabase
-        .from('profiles')
+        .from('users_view')
         .select(`*`)
         .eq('id', userId)
         .single();
@@ -38,10 +38,7 @@ export const getProfile = async (userId: string, email: string): Promise<User | 
         console.error("Error fetching profile:", error);
         return null;
     }
-    if (data) {
-        return { ...snakeToCamel(data), email };
-    }
-    return null;
+    return snakeToCamel(data);
 }
 
 export const getInitialData = async (user: User) => {
@@ -63,7 +60,7 @@ export const getInitialData = async (user: User) => {
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
             supabase.from('enrollments').select('*'),
-            supabase.from('profiles').select('*'), // For admin/instructor views
+            supabase.from('users_view').select('*'), // Fetch from view to get emails
             supabase.from('conversations').select('*').contains('participant_ids', [user.id]),
             supabase.from('messages').select('*'),
             supabase.from('calendar_events').select('*').eq('user_id', user.id),
@@ -146,7 +143,7 @@ export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]
             id: post.author.id,
             firstName: post.author.firstName,
             lastName: post.author.lastName,
-            avatar: post.author.avatarUrl
+            avatarUrl: post.author.avatarUrl
         },
         replies: [] // Placeholder for replies
     }));
@@ -156,6 +153,29 @@ export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]
 // ====================================================================================
 // ===== DATA MUTATION API
 // ====================================================================================
+export const updateUserProfile = async (userId: string, updates: { firstName?: string; lastName?: string; role?: Role; }) => {
+    const payload = {
+        first_name: updates.firstName,
+        last_name: updates.lastName,
+        role: updates.role,
+    };
+    
+    // remove undefined keys
+    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', userId)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error updating user profile:', error);
+        return { success: false, error };
+    }
+    return { success: true, data: snakeToCamel(data) };
+};
 
 export const postDiscussion = async (post: { lessonId: string; authorId: string; content: string; }): Promise<DiscussionPost | null> => {
     const { lessonId, authorId, content } = post;
@@ -176,7 +196,7 @@ export const postDiscussion = async (post: { lessonId: string; authorId: string;
             id: newPost.author.id,
             firstName: newPost.author.firstName,
             lastName: newPost.author.lastName,
-            avatar: newPost.author.avatarUrl
+            avatarUrl: newPost.author.avatarUrl
         },
         replies: []
     };
