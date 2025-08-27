@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
@@ -347,9 +348,9 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                     onRetry={() => setPlayerView('lesson')} 
                  />
               ) : currentLesson?.type === LessonType.VIDEO ? (
-                <div className="w-full h-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"><iframe className="w-full h-full" src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?autoplay=1&rel=0`} title={currentLesson.title} allow="autoplay; fullscreen" /></div>
+                <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"><iframe className="w-full h-full" src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0`} title={currentLesson.title} allow="fullscreen" /></div>
               ) : currentLesson?.type === LessonType.TEXT ? (
-                <div className="w-full max-w-4xl h-full bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg prose prose-lg dark:prose-invert overflow-y-auto"><p>{currentLesson.content.text}</p></div>
+                <div className="w-full max-w-4xl h-full bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg prose prose-lg dark:prose-invert overflow-y-auto" dangerouslySetInnerHTML={{ __html: currentLesson.content.text || '' }}></div>
               ) : currentLesson?.type === LessonType.PDF ? (
                 <div className="w-full h-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg"><iframe src={currentLesson.content.pdfUrl} className="w-full h-full" /></div>
               ) : currentLesson?.type === LessonType.QUIZ && currentLesson.content.quizData ? (
