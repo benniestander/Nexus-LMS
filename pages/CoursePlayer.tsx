@@ -22,7 +22,7 @@ const QuizView: React.FC<{ quizData: QuizData; lessonTitle: string; onQuizSubmit
         <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg w-full max-w-4xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
                 <ClipboardListIcon className="w-8 h-8 text-pink-500" />
-                <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300">Quiz: {lessonTitle}</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold">Quiz: {lessonTitle}</h2>
             </div>
             <p className="text-gray-600 dark:text-gray-400 mb-8">Test your knowledge from this section.</p>
             <form onSubmit={handleSubmit}>
@@ -51,7 +51,11 @@ const QuizView: React.FC<{ quizData: QuizData; lessonTitle: string; onQuizSubmit
     );
 };
 
-const QuizResult: React.FC<{ result: { score: number; passed: boolean; passingScore: number; }; onContinue: () => void; }> = ({ result, onContinue }) => (
+const QuizResult: React.FC<{ 
+    result: { score: number; passed: boolean; passingScore: number; }; 
+    onContinue: () => void;
+    onRetry: () => void;
+}> = ({ result, onContinue, onRetry }) => (
     <div className={`p-8 rounded-2xl shadow-lg text-center ${result.passed ? 'bg-green-50 dark:bg-green-900/50 border-green-500' : 'bg-red-50 dark:bg-red-900/50 border-red-500'} border-2`}>
         <h2 className="text-4xl font-bold">{result.passed ? "Congratulations!" : "Keep Trying!"}</h2>
         <p className="text-xl mt-4">You scored</p>
@@ -66,7 +70,7 @@ const QuizResult: React.FC<{ result: { score: number; passed: boolean; passingSc
             (<>
                 <p className="text-gray-600 dark:text-gray-400 mt-4">You did not pass. Please review the material and try again. Passing score: {result.passingScore}%</p>
                  <div className="flex justify-center gap-4 mt-8">
-                    <button onClick={onContinue} className="bg-blue-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-600 transition-all text-lg">Review & Retry</button>
+                    <button onClick={onRetry} className="bg-blue-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-600 transition-all text-lg">Retry Quiz</button>
                 </div>
             </>)
         }
@@ -153,7 +157,7 @@ const ChatbotView: React.FC<{ messages: ChatMessage[]; onSendMessage: (message: 
         <div className="bg-white dark:bg-gray-800 w-full h-full flex flex-col">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 flex-shrink-0">
                  <div className="p-1.5 bg-pink-100 dark:bg-pink-900/50 rounded-full"><PlayCircleIcon className="w-7 h-7 text-pink-500" /></div>
-                 <div><h3 className="text-lg font-bold text-blue-700 dark:text-blue-300">Nicky</h3><p className="text-sm text-gray-500 dark:text-gray-400">Your AI learning partner</p></div>
+                 <div><h3 className="text-lg font-bold">Nicky</h3><p className="text-sm text-gray-500 dark:text-gray-400">Your AI learning partner</p></div>
             </div>
             <div className="flex-grow p-4 overflow-y-auto space-y-5">{messages.map((message) => (<div key={message.id} className={`flex items-end gap-2.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>{message.role === 'bot' && ( <PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /> )}<div className={`max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl ${message.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}><p className="text-sm">{message.content}</p></div>{message.role === 'user' && ( <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0"><UserCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" /></div> )}</div>))}{isBotReplying && (<div className="flex items-end gap-2.5 justify-start"><PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /><div className="max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-none"><div className="flex items-center gap-2"><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce"></span></div></div></div>)}<div ref={messagesEndRef} /></div>
             <form onSubmit={handleSend} className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2.5 flex-shrink-0"><input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask Nicky anything..." className="flex-grow p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-pink-500" disabled={isBotReplying} /><button type="submit" className="bg-pink-500 text-white p-2.5 rounded-lg hover:bg-pink-600 disabled:bg-gray-400" disabled={!input.trim() || isBotReplying}><SendIcon className="w-5 h-5" /></button></form>
@@ -324,7 +328,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
           <div className="p-4 sm:p-8 sm:pb-6 flex justify-between items-start gap-4">
               <div>
                 <p className="text-pink-500 font-semibold">{course.title}</p>
-                <h1 className="text-2xl sm:text-4xl font-bold text-blue-700 dark:text-blue-300 mt-1">{currentLesson?.title}</h1>
+                <h1 className="text-2xl sm:text-4xl font-bold mt-1">{currentLesson?.title}</h1>
                 <p className="text-gray-500 mt-2 hidden sm:block">{currentModule?.title}</p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
@@ -337,7 +341,11 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
           
           <div className="flex-grow flex items-center justify-center p-4 sm:p-8 pt-0">
               {playerView === 'quiz_result' && lastQuizResult ? (
-                 <QuizResult result={lastQuizResult} onContinue={() => currentLesson?.type === LessonType.QUIZ && !lastQuizResult.passed ? setPlayerView('lesson') : handleContinue()} />
+                 <QuizResult 
+                    result={lastQuizResult} 
+                    onContinue={handleContinue}
+                    onRetry={() => setPlayerView('lesson')} 
+                 />
               ) : currentLesson?.type === LessonType.VIDEO ? (
                 <div className="w-full h-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"><iframe className="w-full h-full" src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?autoplay=1&rel=0`} title={currentLesson.title} allow="autoplay; fullscreen" /></div>
               ) : currentLesson?.type === LessonType.TEXT ? (
@@ -405,7 +413,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
 
       <aside className={`fixed top-0 right-0 h-full w-80 sm:w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col z-50 transition-transform duration-300 ease-in-out md:relative md:w-96 md:translate-x-0 ${isPlayerSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400">{course.title}</h2>
+            <h2 className="text-xl font-bold">{course.title}</h2>
             <button onClick={() => setIsPlayerSidebarOpen(false)} className="md:hidden p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
                 <XIcon className="w-6 h-6"/>
             </button>
@@ -422,7 +430,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
               <div className="overflow-y-auto">
                 {course.modules.map((module, moduleIndex) => (
                   <div key={module.id} className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-3">Module {moduleIndex + 1}: {module.title}</h3>
+                    <h3 className="font-bold mb-3">Module {moduleIndex + 1}: {module.title}</h3>
                     <ul>
                       {module.lessons.map((lesson, lessonIndexInModule) => {
                         const globalLessonIndex = allLessons.findIndex(l => l.id === lesson.id);

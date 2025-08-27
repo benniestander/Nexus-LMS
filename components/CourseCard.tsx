@@ -33,7 +33,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, user, progress, 
         <div className="absolute top-3 right-3 bg-gray-900/50 text-white text-xs font-semibold px-2 py-1 rounded-full">{course.category}</div>
       </div>
       <div className="p-5 flex flex-col flex-grow">
-        <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 group-hover:text-pink-500 transition-colors">{course.title}</h3>
+        <h3 className="text-lg font-bold group-hover:text-pink-500 transition-colors">{course.title}</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">by {course.instructorName}</p>
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-3 space-x-4">
             <div className="flex items-center space-x-1.5">

@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
     onLogout();
   };
   
-  const logoUrl = "https://i.imgur.com/2yZtpe2.png";
+  const logoUrl = "https://i.postimg.cc/TYYjfM7n/Nexus-logo.jpg";
 
   const handleNavigateClick = (view: Exclude<View, 'player' | 'course-editor'>) => {
     onNavigate(view);
@@ -111,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
     <aside className={`fixed inset-y-0 left-0 md:relative md:translate-x-0 w-64 bg-white dark:bg-gray-800 h-full flex flex-col z-50 transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between h-20 px-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <a href="#" onClick={(e) => { e.preventDefault(); handleNavigateClick('dashboard'); }} className="flex items-center gap-2">
-            <img src={logoUrl} alt="Nexus by Intersect Logo" className="h-12" />
+            <img src={logoUrl} alt="Nexus by Intersect Logo" className="h-10" />
         </a>
         <button onClick={closeMenu} className="md:hidden p-2 text-gray-500 dark:text-gray-400">
             <XIcon className="w-6 h-6" />

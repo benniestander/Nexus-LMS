@@ -63,7 +63,7 @@ const StudentDashboardComponent: React.FC<{
     <div className="p-4 md:p-8">
       <div className="text-center max-w-3xl mx-auto">
         <LayoutDashboardIcon className="w-16 h-16 mx-auto text-pink-500" />
-        <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-blue-700 dark:text-blue-300">Welcome back, {user.firstName}!</h1>
+        <h1 className="mt-4 text-4xl md:text-5xl font-extrabold">Welcome back, {user.firstName}!</h1>
         <p className="mt-4 text-lg md:text-xl text-gray-600 dark:text-gray-400">Ready to continue your learning journey?</p>
       </div>
       
@@ -83,7 +83,7 @@ const StudentDashboardComponent: React.FC<{
       </div>
 
       <section className="mt-16">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">My Library</h2>
+        <h2 className="text-2xl font-bold">My Library</h2>
         {enrolledCourses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-6">
             {enrolledCourses.map(course => (
@@ -104,7 +104,7 @@ const StudentDashboardComponent: React.FC<{
       </section>
 
       <section className="mt-16">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Explore Courses</h2>
+        <h2 className="text-2xl font-bold">Explore Courses</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-6">
           {availableCourses.map(course => (
             <CourseCard 
@@ -143,7 +143,7 @@ const InstructorDashboard: React.FC<{
         <div className="p-4 md:p-8">
             <div className="text-center max-w-3xl mx-auto">
                 <LayoutDashboardIcon className="w-16 h-16 mx-auto text-pink-500" />
-                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-purple-700 dark:text-purple-300">Instructor Dashboard</h1>
+                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold">Instructor Dashboard</h1>
                 <p className="mt-4 text-lg md:text-xl text-gray-600 dark:text-gray-400">Manage your courses and view student analytics.</p>
             </div>
 
@@ -155,13 +155,13 @@ const InstructorDashboard: React.FC<{
 
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Student Engagement</h3>
+                    <h3 className="text-xl font-bold">Student Engagement</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">New enrollments over the last 6 months</p>
                     <SimpleBarChart data={generatePlaceholderChartData('Month')} color="var(--brand-purple)" />
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Your Courses</h3>
+                        <h3 className="text-xl font-bold">Your Courses</h3>
                         <button 
                             onClick={() => onEditCourse({} as Course)} 
                             className="flex items-center gap-2 text-sm font-semibold text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300 bg-pink-100/50 dark:bg-pink-900/30 hover:bg-pink-100 dark:hover:bg-pink-900/50 px-3 py-1.5 rounded-lg transition-all"
@@ -201,7 +201,7 @@ const AdminDashboard: React.FC<{ user: User, courses: Course[], enrollments: Enr
         <div className="p-4 md:p-8">
             <div className="text-center max-w-3xl mx-auto">
                 <LayoutDashboardIcon className="w-16 h-16 mx-auto text-pink-500" />
-                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-gray-100">Platform Overview</h1>
+                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold">Platform Overview</h1>
                 <p className="mt-4 text-lg md:text-xl text-gray-600 dark:text-gray-400">Key metrics for the Nexus LMS.</p>
             </div>
             
@@ -213,12 +213,12 @@ const AdminDashboard: React.FC<{ user: User, courses: Course[], enrollments: Enr
 
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">New User Signups</h3>
+                    <h3 className="text-xl font-bold">New User Signups</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Last 6 months</p>
                     <SimpleBarChart data={generatePlaceholderChartData('Month')} color="var(--brand-blue)" />
                 </div>
                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Course Performance</h3>
+                    <h3 className="text-xl font-bold">Course Performance</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Average completion rate by category</p>
                      <SimpleBarChart data={generatePlaceholderChartData('Course', 4)} color="var(--brand-pink)" />
                 </div>

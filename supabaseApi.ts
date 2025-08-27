@@ -135,15 +135,17 @@ export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]
         return [];
     }
 
+    const defaultAuthor = { id: 'deleted', firstName: 'Deleted', lastName: 'User', avatarUrl: '' };
+
     // TODO: Implement fetching replies recursively if needed
     return snakeToCamel(data).map((post: any) => ({
         ...post,
-        author: {
+        author: post.author ? {
             id: post.author.id,
             firstName: post.author.firstName,
             lastName: post.author.lastName,
             avatarUrl: post.author.avatarUrl
-        },
+        } : defaultAuthor,
         replies: [] // Placeholder for replies
     }));
 }
@@ -188,15 +190,18 @@ export const postDiscussion = async (post: { lessonId: string; authorId: string;
         console.error('Error posting discussion:', error);
         return null;
     }
+
+    const defaultAuthor = { id: 'deleted', firstName: 'Deleted', lastName: 'User', avatarUrl: '' };
     const newPost = snakeToCamel(data);
+
     return {
         ...newPost,
-         author: {
+         author: newPost.author ? {
             id: newPost.author.id,
             firstName: newPost.author.firstName,
             lastName: newPost.author.lastName,
             avatarUrl: newPost.author.avatarUrl
-        },
+        } : defaultAuthor,
         replies: []
     };
 };

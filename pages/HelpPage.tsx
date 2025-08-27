@@ -80,7 +80,7 @@ export const HelpPage: React.FC<{ user: User }> = ({ user }) => {
         <div className="p-4 md:p-8">
             <div className="text-center max-w-3xl mx-auto">
                 <LifeBuoyIcon className="w-16 h-16 mx-auto text-pink-500" />
-                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-blue-700 dark:text-blue-300">Help Center</h1>
+                <h1 className="mt-4 text-4xl md:text-5xl font-extrabold">Help Center</h1>
                 <p className="mt-4 text-lg md:text-xl text-gray-600 dark:text-gray-400">
                     Hello {user.firstName}, how can we help you today? Find answers to common questions below.
                 </p>
@@ -99,7 +99,7 @@ export const HelpPage: React.FC<{ user: User }> = ({ user }) => {
             <div className="mt-16 max-w-4xl mx-auto">
                 {filteredFaqData.map(category => (
                     <div key={category.category} className="mb-12">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 pb-2 border-b-2 border-pink-500">{category.category}</h2>
+                        <h2 className="text-2xl font-bold mb-4 pb-2 border-b-2 border-pink-500">{category.category}</h2>
                         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
                            {category.questions.map((item, index) => (
                                 <FaqAccordion 
@@ -122,7 +122,7 @@ export const HelpPage: React.FC<{ user: User }> = ({ user }) => {
 
             <div className="mt-16 pt-12 border-t border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
                  <div className="text-center">
-                    <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Still need help?</h2>
+                    <h2 className="text-3xl font-bold">Still need help?</h2>
                     <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">If you can't find the answer you're looking for, please reach out to our support team.</p>
                 </div>
                 <form className="mt-8 bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg space-y-6">

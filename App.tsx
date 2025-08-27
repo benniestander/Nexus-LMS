@@ -351,6 +351,14 @@ const App: React.FC = () => {
         );
     }
 
+    // FIX: Add a guard to handle the case where the view is 'player' but there's no selected course.
+    // This satisfies TypeScript's type checker for the final return statement.
+    if (currentView === 'player') {
+        // This is an inconsistent state which should ideally not be reached.
+        // Returning null prevents a crash.
+        return null;
+    }
+
     return (
         <ManagementPages
             view={currentView}

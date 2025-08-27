@@ -22,7 +22,7 @@ export enum LessonType {
   VIDEO = 'video',
   TEXT = 'text',
   PDF = 'pdf',
-  QUIZ = 'quiz', // Making quiz a lesson type itself
+  QUIZ = 'quiz',
 }
 
 export interface Question {
@@ -49,7 +49,6 @@ export interface Lesson {
     quizData?: QuizData;
   };
   duration: number; // in minutes
-  // FIX: Added 'order' property to allow sorting of lessons.
   order: number;
 }
 
@@ -58,7 +57,6 @@ export interface Module {
   courseId: string;
   title: string;
   lessons: Lesson[];
-  // FIX: Added 'order' property to allow sorting of modules.
   order: number;
 }
 
