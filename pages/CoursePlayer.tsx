@@ -7,6 +7,30 @@ import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon
 
 type PlayerView = 'lesson' | 'quiz_result';
 
+// --- Helper functions to parse video URLs and extract IDs ---
+const getYouTubeId = (url: string): string | null => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    // Handle cases where the URL is just the ID itself, or a valid parsed ID
+    if (match && match[2].length === 11) {
+        return match[2];
+    }
+    if (url.length === 11 && !url.includes('/')) {
+        return url;
+    }
+    return null;
+};
+
+const getVimeoId = (url: string): string | null => {
+    if (!url) return null;
+    if (/^\d+$/.test(url)) return url; // It's already an ID
+    const regExp = /https?:\/\/(?:www\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/;
+    const match = url.match(regExp);
+    return match ? match[3] : null;
+};
+
+
 // --- Quiz View (part of a lesson now) ---
 const QuizView: React.FC<{ quizData: QuizData; lessonTitle: string; onQuizSubmit: (answers: Record<string, number>) => void; }> = ({ quizData, lessonTitle, onQuizSubmit }) => {
     const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -96,6 +120,14 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     setOrigin(window.location.origin);
   }, []);
   
+  const videoId = useMemo(() => {
+      if (!currentLesson?.content.videoData) return null;
+      const { provider, url } = currentLesson.content.videoData;
+      if (provider === 'youtube') return getYouTubeId(url);
+      if (provider === 'vimeo') return getVimeoId(url);
+      return url; // For self-hosted, the url is the "id"
+  }, [currentLesson]);
+
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
   const isCurrentLessonComplete = currentLesson ? enrollment.completedLessonIds.includes(currentLesson.id) : false;
@@ -217,36 +249,44 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                  />
               ) : currentLesson?.type === LessonType.VIDEO && currentLesson.content.videoData && origin ? (
                 <div className="w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
-                    {currentLesson.content.videoData.provider === 'youtube' && (
+                   {!videoId ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 text-white p-4 text-center">
+                            <h2 className="text-2xl font-bold mb-2">Video Unavailable</h2>
+                            <p className="text-gray-300">The video for this lesson could not be loaded. The URL might be incorrect or the video may have been removed.</p>
+                        </div>
+                    ) : currentLesson.content.videoData.provider === 'youtube' ? (
                         <iframe 
                             className="w-full h-full" 
-                            src={`https://www.youtube.com/embed/${currentLesson.content.videoData.url}?rel=0&origin=${origin}`} 
+                            src={`https://www.youtube.com/embed/${videoId}?rel=0&origin=${origin}`} 
                             title={currentLesson.title} 
                             frameBorder="0"
                             allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                             referrerPolicy="strict-origin-when-cross-origin"
                             allowFullScreen
                         ></iframe>
-                    )}
-                    {currentLesson.content.videoData.provider === 'self_hosted' && (
-                        <video
-                            className="w-full h-full bg-black"
-                            src={currentLesson.content.videoData.url}
-                            controls
-                            autoPlay
-                        >
-                            Your browser does not support the video tag.
-                        </video>
-                    )}
-                    {currentLesson.content.videoData.provider === 'vimeo' && (
+                    ) : currentLesson.content.videoData.provider === 'vimeo' ? (
                         <iframe
                             className="w-full h-full"
-                            src={`https://player.vimeo.com/video/${currentLesson.content.videoData.url}`}
+                            src={`https://player.vimeo.com/video/${videoId}`}
                             title={currentLesson.title}
                             frameBorder="0"
                             allow="autoplay; fullscreen; picture-in-picture"
                             allowFullScreen
                         ></iframe>
+                    ) : currentLesson.content.videoData.provider === 'self_hosted' ? (
+                        <video
+                            className="w-full h-full bg-black"
+                            src={videoId}
+                            controls
+                            autoPlay
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 text-white p-4 text-center">
+                            <h2 className="text-2xl font-bold mb-2">Unsupported Video</h2>
+                            <p className="text-gray-300">This video provider is not supported.</p>
+                        </div>
                     )}
                 </div>
               ) : currentLesson?.type === LessonType.TEXT ? (
