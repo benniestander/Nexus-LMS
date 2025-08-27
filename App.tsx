@@ -54,30 +54,40 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
+    // isLoading is true by default. We set it to false only when the initial auth check
+    // and data load is complete, preventing the app from getting stuck.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        setIsLoading(true);
         try {
             setSession(session);
             if (session) {
                 const userProfile = await api.getProfile(session.user.id);
-                setCurrentUser(userProfile);
-                if(userProfile) {
+                if (userProfile) {
+                    setCurrentUser(userProfile);
                     await loadAppData(userProfile);
                 } else {
-                    console.error("User is authenticated but has no profile.");
+                    // If a user is authenticated but has no profile, it's an invalid state.
+                    // It's safer to sign them out to avoid errors.
+                    console.error("User is authenticated but has no profile. Signing out.");
+                    await supabase.auth.signOut();
+                    setCurrentUser(null);
                 }
             } else {
+                // If there's no session, clear the user.
                 setCurrentUser(null);
             }
         } catch (error) {
-            console.error("Error in auth state change:", error);
+            console.error("Error during authentication state change:", error);
+            // Ensure user state is cleared on error.
             setCurrentUser(null);
         } finally {
+            // No matter the outcome (login, logout, error), the initial loading process is complete.
             setIsLoading(false);
         }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+        subscription.unsubscribe();
+    };
   }, [loadAppData]);
 
   const refetchData = useCallback(() => {
