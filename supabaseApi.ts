@@ -55,7 +55,7 @@ export const getInitialData = async (user: User) => {
             historyLogsRes,
             liveSessionsRes
         ] = await Promise.all([
-            supabase.from('courses').select('*, instructor:instructor_id(first_name, last_name)'),
+            supabase.from('courses').select('*, instructor:profiles!instructor_id(first_name, last_name)'),
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
             supabase.from('enrollments').select('*'),
@@ -125,7 +125,7 @@ export const getInitialData = async (user: User) => {
 export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]> => {
     const { data, error } = await supabase
         .from('discussion_posts')
-        .select(`*, author:author_id(id, first_name, last_name, avatar_url)`)
+        .select(`*, author:profiles!author_id(id, first_name, last_name, avatar_url)`)
         .eq('lesson_id', lessonId)
         .is('parent_post_id', null) // Fetch only top-level posts
         .order('timestamp', { ascending: false });
@@ -181,7 +181,7 @@ export const postDiscussion = async (post: { lessonId: string; authorId: string;
     const { data, error } = await supabase
         .from('discussion_posts')
         .insert({ lesson_id: lessonId, author_id: authorId, content })
-        .select(`*, author:author_id(id, first_name, last_name, avatar_url)`)
+        .select(`*, author:profiles!author_id(id, first_name, last_name, avatar_url)`)
         .single();
     
     if (error) {
