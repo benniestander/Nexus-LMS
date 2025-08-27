@@ -1,16 +1,11 @@
 
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
+import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
-import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, UserCircleIcon, AwardIcon } from '../components/Icons';
-import { GoogleGenAI } from "@google/genai";
-import * as api from '../supabaseApi';
-
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, BookOpenIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, AwardIcon } from '../components/Icons';
 
 type PlayerView = 'lesson' | 'quiz_result';
-type SidebarTab = 'curriculum' | 'chatbot' | 'discussions';
 
 // --- Quiz View (part of a lesson now) ---
 const QuizView: React.FC<{ quizData: QuizData; lessonTitle: string; onQuizSubmit: (answers: Record<string, number>) => void; }> = ({ quizData, lessonTitle, onQuizSubmit }) => {
@@ -77,94 +72,6 @@ const QuizResult: React.FC<{
     </div>
 );
 
-// --- Discussion View ---
-const DiscussionView: React.FC<{ lessonId: string, user: User }> = ({ lessonId, user }) => {
-    const [posts, setPosts] = useState<DiscussionPost[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [newPost, setNewPost] = useState('');
-
-    useEffect(() => {
-        const fetchDiscussions = async () => {
-            setIsLoading(true);
-            const discussionPosts = await api.getDiscussions(lessonId);
-            setPosts(discussionPosts);
-            setIsLoading(false);
-        }
-        fetchDiscussions();
-    }, [lessonId]);
-
-    const handlePost = async () => {
-        if (!newPost.trim()) return;
-        const postData = {
-            lessonId,
-            authorId: user.id,
-            content: newPost.trim()
-        };
-        const savedPost = await api.postDiscussion(postData);
-        if (savedPost) {
-             setPosts(prev => [savedPost, ...prev]);
-             setNewPost('');
-        }
-    };
-
-    return (
-        <div className="p-4 h-full flex flex-col">
-            <div className="flex-shrink-0 mb-4">
-                <textarea 
-                    value={newPost}
-                    onChange={e => setNewPost(e.target.value)}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" 
-                    rows={3}
-                    placeholder="Ask a question or start a discussion..."
-                />
-                <button onClick={handlePost} className="mt-2 bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-pink-600">Post</button>
-            </div>
-            <div className="flex-grow overflow-y-auto space-y-4">
-                {isLoading ? <p className="text-center text-gray-500">Loading discussions...</p> : 
-                 posts.length > 0 ? (
-                    posts.map(post => (
-                        <div key={post.id} className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
-                            <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                                    <UserCircleIcon className="w-6 h-6 text-gray-500" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-sm">{post.author.firstName} {post.author.lastName}</p>
-                                    <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
-                                    <p className="mt-2 text-gray-800 dark:text-gray-200">{post.content}</p>
-                                </div>
-                            </div>
-                        </div>
-                    ))
-                 ) : (
-                    <p className="text-center text-gray-500">No discussions yet. Be the first to post!</p>
-                 )
-                }
-            </div>
-        </div>
-    );
-};
-
-
-// --- Chatbot Component (for sidebar) ---
-const ChatbotView: React.FC<{ messages: ChatMessage[]; onSendMessage: (message: string) => void; isBotReplying: boolean; user: User; }> = ({ messages, onSendMessage, isBotReplying, user }) => {
-    // ... same as original ...
-    const [input, setInput] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-    const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (input.trim()) { onSendMessage(input.trim()); setInput(''); } };
-    return (
-        <div className="bg-white dark:bg-gray-800 w-full h-full flex flex-col">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 flex-shrink-0">
-                 <div className="p-1.5 bg-pink-100 dark:bg-pink-900/50 rounded-full"><PlayCircleIcon className="w-7 h-7 text-pink-500" /></div>
-                 <div><h3 className="text-lg font-bold">Nicky</h3><p className="text-sm text-gray-500 dark:text-gray-400">Your AI learning partner</p></div>
-            </div>
-            <div className="flex-grow p-4 overflow-y-auto space-y-5">{messages.map((message) => (<div key={message.id} className={`flex items-end gap-2.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>{message.role === 'bot' && ( <PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /> )}<div className={`max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl ${message.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}><p className="text-sm">{message.content}</p></div>{message.role === 'user' && ( <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0"><UserCircleIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" /></div> )}</div>))}{isBotReplying && (<div className="flex items-end gap-2.5 justify-start"><PlayCircleIcon className="w-7 h-7 text-pink-500 flex-shrink-0 self-start" /><div className="max-w-xs lg:max-w-sm px-3.5 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-none"><div className="flex items-center gap-2"><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span><span className="h-2 w-2 bg-pink-500 rounded-full animate-bounce"></span></div></div></div>)}<div ref={messagesEndRef} /></div>
-            <form onSubmit={handleSend} className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2.5 flex-shrink-0"><input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask Nicky anything..." className="flex-grow p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-pink-500" disabled={isBotReplying} /><button type="submit" className="bg-pink-500 text-white p-2.5 rounded-lg hover:bg-pink-600 disabled:bg-gray-400" disabled={!input.trim() || isBotReplying}><SendIcon className="w-5 h-5" /></button></form>
-        </div>
-    );
-};
-
 interface CoursePlayerProps {
   user: User;
   course: Course;
@@ -181,9 +88,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(findInitialLesson());
   const [playerView, setPlayerView] = useState<PlayerView>('lesson');
   const [lastQuizResult, setLastQuizResult] = useState<{ score: number; passed: boolean; passingScore: number; } | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('curriculum');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isBotReplying, setIsBotReplying] = useState(false);
   const [isPlayerSidebarOpen, setIsPlayerSidebarOpen] = useState(false);
   const [origin, setOrigin] = useState('');
 
@@ -284,47 +188,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
       }
     }
   };
-
-  const handleSendMessage = async (message:string) => {
-    setIsBotReplying(true);
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message };
-    setChatHistory(prev => [...prev, userMessage]);
-
-    try {
-        const model = 'gemini-2.5-flash';
-        const systemInstruction = `You are Nicky, an expert AI learning partner embedded in the Nexus LMS. 
-        Your goal is to help students understand the course material better.
-        The user is currently on the lesson titled "${currentLesson?.title}" within the course "${course.title}".
-        Keep your answers concise, helpful, and encouraging. Do not go off-topic.
-        Base your answer on the provided context if possible, but you can use general knowledge to explain concepts.`;
-        
-        const prompt = `Based on the lesson "${currentLesson?.title}", help me with this: ${message}`;
-        
-        const response = await ai.models.generateContent({
-            model,
-            contents: prompt,
-            config: {
-                systemInstruction,
-            }
-        });
-
-        const botResponse: ChatMessage = { id: crypto.randomUUID(), role: 'bot', content: response.text };
-        setChatHistory(prev => [...prev, botResponse]);
-
-    } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        const errorResponse: ChatMessage = { id: crypto.randomUUID(), role: 'bot', content: "Sorry, I'm having trouble connecting right now. Please try again later." };
-        setChatHistory(prev => [...prev, errorResponse]);
-    } finally {
-        setIsBotReplying(false);
-    }
-};
-
-  useEffect(() => {
-    if (sidebarTab === 'chatbot' && chatHistory.length === 0) {
-      setChatHistory([{ id: 'bot-welcome', role: 'bot', content: `Hello! I'm Nicky. How can I help you with "${currentLesson?.title}"?` }]);
-    }
-  }, [sidebarTab, currentLesson?.title, chatHistory.length]);
 
   const canComplete = currentLesson && currentLesson.type !== LessonType.QUIZ && !isCurrentLessonComplete;
 
@@ -458,40 +321,27 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
         </div>
         <div className="mt-4 px-6"><ProgressBar progress={courseProgress} /><p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">{enrollment.completedLessonIds.length} of {allLessons.length} lessons completed</p></div>
         
-        <div className="border-b border-gray-200 dark:border-gray-700 flex flex-shrink-0 mt-4">
-            <button onClick={() => setSidebarTab('curriculum')} className={`flex-1 p-4 font-semibold flex items-center justify-center gap-2 ${sidebarTab === 'curriculum' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><BookOpenIcon className="w-5 h-5"/>Curriculum</button>
-            <button onClick={() => setSidebarTab('discussions')} className={`flex-1 p-4 font-semibold flex items-center justify-center gap-2 ${sidebarTab === 'discussions' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><MessageSquareIcon className="w-5 h-5"/>Discussions</button>
-            <button onClick={() => setSidebarTab('chatbot')} className={`flex-1 p-4 font-semibold flex items-center justify-center gap-2 ${sidebarTab === 'chatbot' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><PlayCircleIcon className="w-5 h-5"/>AI Help</button>
-        </div>
-        <div className="flex-grow overflow-y-auto flex flex-col min-h-0">
-          {sidebarTab === 'curriculum' ? (
-              <div className="overflow-y-auto">
-                {course.modules.map((module, moduleIndex) => (
-                  <div key={module.id} className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="font-bold mb-3">Module {moduleIndex + 1}: {module.title}</h3>
-                    <ul>
-                      {module.lessons.map((lesson, lessonIndexInModule) => {
-                        const globalLessonIndex = allLessons.findIndex(l => l.id === lesson.id);
-                        const isCompleted = enrollment.completedLessonIds.includes(lesson.id);
-                        const isCurrent = lesson.id === currentLesson?.id;
-                        const unlocked = isLessonUnlocked(globalLessonIndex);
-                        const LessonIcon = lesson.type === LessonType.VIDEO ? PlayCircleIcon : lesson.type === LessonType.PDF ? FileTextIcon : lesson.type === LessonType.QUIZ ? ClipboardListIcon : BookOpenIcon;
-                        return (
-                          <li key={lesson.id}>
-                            <a href="#" onClick={(e) => { e.preventDefault(); if (unlocked) handleSelectLesson(lesson); }} className={`flex items-start gap-3 p-3 rounded-lg mb-1 transition-colors ${!unlocked ? 'opacity-50 cursor-not-allowed' : (isCurrent ? 'bg-pink-100 dark:bg-pink-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50')}`}>
-                              <div className="mt-0.5 flex-shrink-0 w-5 h-5 flex items-center justify-center">{isCompleted ? <CheckCircle2Icon className="w-5 h-5 text-green-500" /> : (unlocked ? <LessonIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" /> : <LockIcon className="w-4 h-4 text-gray-400 dark:text-gray-500"/>) }</div>
-                              <div className="flex-grow"><p className={`font-semibold ${isCurrent ? 'text-pink-600 dark:text-pink-400' : (unlocked ? 'text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400')}`}>{lesson.title}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5"><ClockIcon className="w-3 h-3" /> {lesson.duration} min</p></div>
-                            </a>
-                          </li>);
-                      })}
-                    </ul>
-                  </div>))}
-              </div>
-          ) : sidebarTab === 'chatbot' ? (
-            <ChatbotView messages={chatHistory} onSendMessage={handleSendMessage} isBotReplying={isBotReplying} user={user} />
-          ) : (
-            currentLesson && <DiscussionView lessonId={currentLesson.id} user={user} />
-          )}
+        <div className="flex-grow overflow-y-auto">
+          {course.modules.map((module, moduleIndex) => (
+            <div key={module.id} className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-bold mb-3">Module {moduleIndex + 1}: {module.title}</h3>
+              <ul>
+                {module.lessons.map((lesson, lessonIndexInModule) => {
+                  const globalLessonIndex = allLessons.findIndex(l => l.id === lesson.id);
+                  const isCompleted = enrollment.completedLessonIds.includes(lesson.id);
+                  const isCurrent = lesson.id === currentLesson?.id;
+                  const unlocked = isLessonUnlocked(globalLessonIndex);
+                  const LessonIcon = lesson.type === LessonType.VIDEO ? PlayCircleIcon : lesson.type === LessonType.PDF ? FileTextIcon : lesson.type === LessonType.QUIZ ? ClipboardListIcon : BookOpenIcon;
+                  return (
+                    <li key={lesson.id}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); if (unlocked) handleSelectLesson(lesson); }} className={`flex items-start gap-3 p-3 rounded-lg mb-1 transition-colors ${!unlocked ? 'opacity-50 cursor-not-allowed' : (isCurrent ? 'bg-pink-100 dark:bg-pink-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50')}`}>
+                        <div className="mt-0.5 flex-shrink-0 w-5 h-5 flex items-center justify-center">{isCompleted ? <CheckCircle2Icon className="w-5 h-5 text-green-500" /> : (unlocked ? <LessonIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" /> : <LockIcon className="w-4 h-4 text-gray-400 dark:text-gray-500"/>) }</div>
+                        <div className="flex-grow"><p className={`font-semibold ${isCurrent ? 'text-pink-600 dark:text-pink-400' : (unlocked ? 'text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400')}`}>{lesson.title}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5"><ClockIcon className="w-3 h-3" /> {lesson.duration} min</p></div>
+                      </a>
+                    </li>);
+                })}
+              </ul>
+            </div>))}
         </div>
       </aside>
     </div>
