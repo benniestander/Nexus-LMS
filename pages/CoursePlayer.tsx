@@ -185,6 +185,12 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isPlayerSidebarOpen, setIsPlayerSidebarOpen] = useState(false);
+  const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    // Set origin dynamically for YouTube embed security
+    setOrigin(window.location.origin);
+  }, []);
   
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
@@ -346,15 +352,17 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                     onContinue={handleContinue}
                     onRetry={() => setPlayerView('lesson')} 
                  />
-              ) : currentLesson?.type === LessonType.VIDEO ? (
+              ) : currentLesson?.type === LessonType.VIDEO && origin ? (
                 <div className="w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
                   <iframe 
                     className="w-full h-full" 
-                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0`} 
+                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0&origin=${origin}`} 
                     title={currentLesson.title} 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    frameBorder="0"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
                     allowFullScreen
-                  />
+                  ></iframe>
                 </div>
               ) : currentLesson?.type === LessonType.TEXT ? (
                 <div className="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg prose prose-lg dark:prose-invert" dangerouslySetInnerHTML={{ __html: currentLesson.content.text || '' }}></div>
