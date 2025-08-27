@@ -268,7 +268,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   }, [sidebarTab, currentLesson?.title, chatHistory.length]);
 
   return (
-    <div className="flex flex-col md:flex-row h-full bg-gray-100 dark:bg-gray-900">
+    <div className="flex flex-col md:flex-row h-full bg-white dark:bg-gray-900">
       <main className="flex-1 flex flex-col min-w-0">
           <div className="p-4 sm:p-8 sm:pb-6 flex justify-between items-start gap-4">
               <div>

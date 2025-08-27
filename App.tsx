@@ -275,7 +275,7 @@ const App: React.FC = () => {
   }
 
   if (isLoading) {
-      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading Nexus...</div>;
+      return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading Nexus...</div>;
   }
   
   if (!session) {
@@ -283,7 +283,7 @@ const App: React.FC = () => {
   }
 
   if (!currentUser) {
-      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Could not load your profile. Please contact support.</div>;
+      return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">Could not load your profile. Please contact support.</div>;
   }
 
   return (

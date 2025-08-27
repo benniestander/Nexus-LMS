@@ -7,10 +7,12 @@ export const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setMessage(null);
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -23,8 +25,29 @@ export const Auth: React.FC = () => {
     }
   };
 
+  const handlePasswordReset = async () => {
+    setError(null);
+    setMessage(null);
+    if (!email) {
+      setError("Please enter your email address to reset your password.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setMessage("Check your email for the password reset link.");
+    } catch (error: any) {
+      setError(error.error_description || error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
             <img src="https://i.postimg.cc/fk4m044D/Nexus-logo.jpg" alt="Nexus Logo" className="w-48 mx-auto" />
@@ -67,9 +90,20 @@ export const Auth: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 dark:bg-gray-700"
                 />
               </div>
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={loading}
+                  className="text-sm font-medium text-pink-600 hover:text-pink-500 focus:outline-none disabled:opacity-50"
+                >
+                  Forgot Password?
+                </button>
+              </div>
             </div>
             
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+            {message && <p className="text-green-500 text-sm text-center">{message}</p>}
 
             <div>
               <button
