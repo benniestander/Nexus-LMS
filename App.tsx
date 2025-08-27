@@ -37,38 +37,49 @@ const App: React.FC = () => {
 
   const loadAppData = useCallback(async (user: User) => {
       setIsLoading(true);
-      const data = await api.getInitialData(user);
-      if (data) {
-          setCourses(data.courses);
-          setEnrollments(data.enrollments);
-          setAllUsers(data.allUsers);
-          setConversations(data.conversations);
-          setMessages(data.messages);
-          setCalendarEvents(data.calendarEvents);
-          setHistoryLogs(data.historyLogs);
-          setLiveSessions(data.liveSessions);
+      try {
+        const data = await api.getInitialData(user);
+        if (data) {
+            setCourses(data.courses);
+            setEnrollments(data.enrollments);
+            setAllUsers(data.allUsers);
+            setConversations(data.conversations);
+            setMessages(data.messages);
+            setCalendarEvents(data.calendarEvents);
+            setHistoryLogs(data.historyLogs);
+            setLiveSessions(data.liveSessions);
+        }
+      } catch (error) {
+          console.error("Failed to load app data:", error);
+      } finally {
+          setIsLoading(false);
       }
-      setIsLoading(false);
   }, []);
   
   useEffect(() => {
     // Rely solely on onAuthStateChange for session management.
     // It fires once initially and then on every auth change.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) {
-        const userProfile = await api.getProfile(session.user.id);
-        setCurrentUser(userProfile);
-        if(userProfile) {
-            await loadAppData(userProfile);
-        } else {
-            console.error("User is authenticated but has no profile.");
-            setIsLoading(false)
+        try {
+            setSession(session);
+            if (session) {
+                const userProfile = await api.getProfile(session.user.id);
+                setCurrentUser(userProfile);
+                if(userProfile) {
+                    await loadAppData(userProfile);
+                } else {
+                    console.error("User is authenticated but has no profile.");
+                    setIsLoading(false);
+                }
+            } else {
+                setCurrentUser(null);
+                setIsLoading(false); // No user, stop loading.
+            }
+        } catch (error) {
+            console.error("Error in auth state change:", error);
+            setCurrentUser(null);
+            setIsLoading(false);
         }
-      } else {
-        setCurrentUser(null);
-        setIsLoading(false); // No user, stop loading.
-      }
     });
 
     return () => subscription.unsubscribe();

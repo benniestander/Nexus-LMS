@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';

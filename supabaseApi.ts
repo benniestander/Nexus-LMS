@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
 
@@ -154,7 +155,7 @@ export const getDiscussions = async (lessonId: string): Promise<DiscussionPost[]
 // ===== DATA MUTATION API
 // ====================================================================================
 export const updateUserProfile = async (userId: string, updates: { firstName?: string; lastName?: string; role?: Role; }) => {
-    const payload = {
+    const payload: { [key: string]: any } = {
         first_name: updates.firstName,
         last_name: updates.lastName,
         role: updates.role,
