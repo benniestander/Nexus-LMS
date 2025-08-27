@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, HistoryLog, HistoryAction, LiveSession } from '../types';
+import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, HistoryLog, HistoryAction, LiveSession, VideoProvider, VideoData } from '../types';
 import { AwardIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, ChevronDownIcon, ChevronUpIcon, EditIcon, FileTextIcon, GripVerticalIcon, PlusCircleIcon, SettingsIcon, Trash2Icon, UsersIcon, PlayCircleIcon, ClipboardListIcon, XIcon, SearchIcon, DownloadIcon, MailIcon, SendIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, MessageSquareIcon, VideoIcon, UserCircleIcon, BoldIcon, ItalicIcon, UnderlineIcon, ListIcon, ListOrderedIcon, ClockIcon } from '../components/Icons';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { CourseCard } from '../components/CourseCard';
@@ -387,8 +387,18 @@ const LessonEditModal: React.FC<{
             const contentField = field.split('.')[1] as keyof Lesson['content'];
             setLesson(prev => ({ ...prev, content: { ...prev.content, [contentField]: value }}));
         } else {
-            setLesson(prev => ({ ...prev, [field]: value }));
+            setLesson(prev => ({ ...prev, [field]: value as any }));
         }
+    };
+
+    const handleTypeChange = (newType: LessonType) => {
+        let newContent: Lesson['content'] = {};
+        if (newType === LessonType.VIDEO) {
+            newContent.videoData = { provider: VideoProvider.YOUTUBE, url: '' };
+        } else if (newType === LessonType.QUIZ) {
+            newContent.quizData = { questions: [], passingScore: 80 };
+        }
+        setLesson(prev => ({ ...prev, type: newType, content: newContent }));
     };
     
     if (!isOpen) return null;
@@ -400,7 +410,7 @@ const LessonEditModal: React.FC<{
                 <div className="space-y-4">
                     <input type="text" value={lesson.title} onChange={e => updateField('title', e.target.value)} placeholder="Lesson Title" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>
                     <div className="flex items-center gap-4">
-                        <select value={lesson.type} onChange={e => updateField('type', e.target.value as LessonType)} className="p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 capitalize">
+                        <select value={lesson.type} onChange={e => handleTypeChange(e.target.value as LessonType)} className="p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 capitalize">
                             {Object.values(LessonType).map(type => <option key={type} value={type} className="capitalize">{type}</option>)}
                         </select>
                         <div className="flex items-center gap-2">
@@ -410,7 +420,42 @@ const LessonEditModal: React.FC<{
                         </div>
                     </div>
                     <div className="max-h-96 overflow-y-auto p-1">
-                        {lesson.type === LessonType.VIDEO && <input type="text" value={lesson.content.videoId || ''} onChange={e => updateField('content.videoId', e.target.value)} placeholder="YouTube Video ID (e.g., dQw4w9WgXcQ)" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
+                        {lesson.type === LessonType.VIDEO && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Video Provider</label>
+                                    <select 
+                                        value={lesson.content.videoData?.provider || 'youtube'} 
+                                        onChange={e => updateField('content.videoData', { 
+                                            ...(lesson.content.videoData || { url: '' }), 
+                                            provider: e.target.value as VideoProvider 
+                                        })}
+                                        className="mt-1 w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                                    >
+                                        <option value="youtube">YouTube</option>
+                                        <option value="vimeo">Vimeo</option>
+                                        <option value="self_hosted">Self-Hosted (URL)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Video URL or ID</label>
+                                    <input 
+                                        type="text" 
+                                        value={lesson.content.videoData?.url || ''} 
+                                        onChange={e => updateField('content.videoData', { 
+                                            ...(lesson.content.videoData || { provider: VideoProvider.YOUTUBE }), 
+                                            url: e.target.value 
+                                        })} 
+                                        placeholder={
+                                            lesson.content.videoData?.provider === 'youtube' ? "YouTube Video ID (e.g., dQw4w9WgXcQ)" :
+                                            lesson.content.videoData?.provider === 'vimeo' ? "Vimeo Video ID (e.g., 123456789)" :
+                                            "Full video URL (e.g., https://.../video.mp4)"
+                                        } 
+                                        className="mt-1 w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                                    />
+                                </div>
+                            </div>
+                        )}
                         {lesson.type === LessonType.TEXT && <RichTextEditor label="Lesson Content" value={lesson.content.text || ''} onChange={val => updateField('content.text', val)} placeholder="Write your lesson content here..." />}
                         {lesson.type === LessonType.PDF && <input type="text" value={lesson.content.pdfUrl || ''} onChange={e => updateField('content.pdfUrl', e.target.value)} placeholder="URL to PDF file" className="w-full p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600"/>}
                         {lesson.type === LessonType.QUIZ && <QuizEditor quizData={lesson.content.quizData || { questions: [], passingScore: 80 }} onUpdate={data => updateField('content.quizData', data)} />}
@@ -476,7 +521,17 @@ const CourseEditorPage: React.FC<{
     };
 
     const handleAddLesson = (mIndex: number) => {
-        const newLesson: Lesson = { id: crypto.randomUUID(), moduleId: course.modules[mIndex].id, title: `New Lesson`, type: LessonType.VIDEO, content: {}, duration: 10, order: course.modules[mIndex].lessons.length };
+        const newLesson: Lesson = { 
+            id: crypto.randomUUID(), 
+            moduleId: course.modules[mIndex].id, 
+            title: `New Lesson`, 
+            type: LessonType.VIDEO, 
+            content: {
+                videoData: { provider: VideoProvider.YOUTUBE, url: '' }
+            }, 
+            duration: 10, 
+            order: course.modules[mIndex].lessons.length 
+        };
         setEditingLesson({ lesson: newLesson, mIndex, lIndex: -1 });
     };
 

@@ -352,17 +352,39 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                     onContinue={handleContinue}
                     onRetry={() => setPlayerView('lesson')} 
                  />
-              ) : currentLesson?.type === LessonType.VIDEO && origin ? (
+              ) : currentLesson?.type === LessonType.VIDEO && currentLesson.content.videoData && origin ? (
                 <div className="w-full max-w-6xl mx-auto aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
-                  <iframe 
-                    className="w-full h-full" 
-                    src={`https://www.youtube.com/embed/${currentLesson.content.videoId}?rel=0&origin=${origin}`} 
-                    title={currentLesson.title} 
-                    frameBorder="0"
-                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  ></iframe>
+                    {currentLesson.content.videoData.provider === 'youtube' && (
+                        <iframe 
+                            className="w-full h-full" 
+                            src={`https://www.youtube.com/embed/${currentLesson.content.videoData.url}?rel=0&origin=${origin}`} 
+                            title={currentLesson.title} 
+                            frameBorder="0"
+                            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allowFullScreen
+                        ></iframe>
+                    )}
+                    {currentLesson.content.videoData.provider === 'self_hosted' && (
+                        <video
+                            className="w-full h-full bg-black"
+                            src={currentLesson.content.videoData.url}
+                            controls
+                            autoPlay
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                    )}
+                    {currentLesson.content.videoData.provider === 'vimeo' && (
+                        <iframe
+                            className="w-full h-full"
+                            src={`https://player.vimeo.com/video/${currentLesson.content.videoData.url}`}
+                            title={currentLesson.title}
+                            frameBorder="0"
+                            allow="autoplay; fullscreen; picture-in-picture"
+                            allowFullScreen
+                        ></iframe>
+                    )}
                 </div>
               ) : currentLesson?.type === LessonType.TEXT ? (
                 <div className="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg prose prose-lg dark:prose-invert" dangerouslySetInnerHTML={{ __html: currentLesson.content.text || '' }}></div>

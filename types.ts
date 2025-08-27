@@ -37,13 +37,24 @@ export interface QuizData {
   passingScore: number; // Percentage (e.g., 80)
 }
 
+export enum VideoProvider {
+  YOUTUBE = 'youtube',
+  VIMEO = 'vimeo',
+  SELF_HOSTED = 'self_hosted',
+}
+
+export interface VideoData {
+  provider: VideoProvider;
+  url: string; // YouTube ID, Vimeo ID, or full URL for self-hosted
+}
+
 export interface Lesson {
   id: string;
   moduleId: string;
   title: string;
   type: LessonType;
   content: {
-    videoId?: string; // YouTube video ID
+    videoData?: VideoData;
     text?: string;
     pdfUrl?: string;
     quizData?: QuizData;
