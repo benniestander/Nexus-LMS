@@ -140,9 +140,14 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  const refetchData = useCallback(() => {
+  const refetchData = useCallback(async () => {
     if (authState.user) {
-      loadAppData(authState.user);
+      await loadAppData(authState.user);
+      // Also refetch the user profile itself in case the name/role was changed
+      const userProfile = await api.getProfile(authState.user.id);
+      if (userProfile) {
+          authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
+      }
     }
   }, [authState.user, loadAppData]);
   
@@ -166,8 +171,9 @@ const App: React.FC = () => {
     closeMobileMenu();
   };
   
-  const handleEditCourse = (course: Course) => {
+  const handleEditCourse = (course: Course | null) => {
       setEditingCourse(course);
+      setCurrentView('course-editor');
       closeMobileMenu();
   };
 
@@ -184,6 +190,29 @@ const App: React.FC = () => {
       alert("Error saving course. Please check the console for details.");
     }
     handleExitCourseEditor();
+  };
+
+  const handleSaveUserProfile = async (updates: Partial<User> & { newPassword?: string }) => {
+    if (!authState.user) return;
+    const { newPassword, ...profileUpdates } = updates;
+    
+    // Update profile table (name, role, etc.)
+    if (Object.keys(profileUpdates).length > 0) {
+        await api.updateUserProfile(authState.user.id, profileUpdates);
+    }
+    
+    // Update auth user (password)
+    if (newPassword) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) {
+            console.error("Error updating password:", error);
+            alert("Error updating password. See console for details.");
+            return;
+        }
+        alert("Password updated successfully!");
+    }
+
+    await refetchData(); // Re-fetch all data to ensure UI is consistent
   };
 
   const handleExitPlayer = () => {
@@ -256,9 +285,9 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!authState.user) return null;
 
-    if (editingCourse) {
+    if (currentView === 'course-editor') {
         return (
-            <ManagementPages
+             <ManagementPages
                 view="course-editor"
                 user={authState.user}
                 courseToEdit={editingCourse}
@@ -273,6 +302,12 @@ const App: React.FC = () => {
                 historyLogs={historyLogs}
                 liveSessions={liveSessions}
                 onRefetchData={refetchData}
+                onSendMessage={handleSendMessage}
+                onUpdateMessages={handleUpdateMessages}
+                onScheduleSession={handleScheduleSession}
+                onEditCourse={handleEditCourse}
+                onSelectCourse={handleSelectCourse}
+                onSaveUserProfile={handleSaveUserProfile}
             />
         );
     }
@@ -320,6 +355,9 @@ const App: React.FC = () => {
             liveSessions={liveSessions}
             onScheduleSession={handleScheduleSession}
             onRefetchData={refetchData}
+            onSave={handleSaveCourse}
+            onExit={handleExitCourseEditor}
+            onSaveUserProfile={handleSaveUserProfile}
         />
     )
   }

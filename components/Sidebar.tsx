@@ -4,6 +4,7 @@ import {
   LayoutDashboardIcon, LibraryIcon, UserCircleIcon, SettingsIcon, PlayCircleIcon, AwardIcon, type IconProps, UsersIcon, BarChart2Icon, BookOpenIcon, LogOutIcon, XIcon, MailIcon, CalendarIcon, HistoryIcon, VideoIcon, LifeBuoyIcon 
 } from './Icons';
 
+// FIX: Added 'course-editor' as a valid view type. It's an internal view like 'player'.
 export type View = 
   | 'dashboard' 
   | 'my-courses'
@@ -18,11 +19,13 @@ export type View =
   | 'player' // internal view
   | 'student-management'
   | 'live-sessions'
-  | 'help';
+  | 'help'
+  | 'course-editor'; // internal view
 
 interface SidebarProps {
   userRole: Role;
-  onNavigate: (view: Exclude<View, 'player'>) => void;
+  // FIX: Excluded 'course-editor' from direct navigation, consistent with 'player'.
+  onNavigate: (view: Exclude<View, 'player' | 'course-editor'>) => void;
   currentView: View;
   isMobileMenuOpen: boolean;
   closeMenu: () => void;
@@ -95,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
   
   const logoUrl = "https://i.postimg.cc/fk4m044D/Nexus-logo.jpg";
 
-  const handleNavigateClick = (view: Exclude<View, 'player'>) => {
+  const handleNavigateClick = (view: Exclude<View, 'player' | 'course-editor'>) => {
     onNavigate(view);
     closeMenu();
   };
@@ -122,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
               icon={item.icon} 
               label={item.label} 
               active={currentView === item.view} 
-              onClick={() => handleNavigateClick(item.view as Exclude<View, 'player'>)} 
+              onClick={() => handleNavigateClick(item.view as Exclude<View, 'player' | 'course-editor'>)} 
             />
           ))}
         </ul>
@@ -135,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onNavigate, currentV
                         icon={item.icon}
                         label={item.label}
                         active={currentView === item.view}
-                        onClick={() => handleNavigateClick(item.view as Exclude<View, 'player'>)}
+                        onClick={() => handleNavigateClick(item.view as Exclude<View, 'player' | 'course-editor'>)}
                     />
                 ))}
                 <li>
