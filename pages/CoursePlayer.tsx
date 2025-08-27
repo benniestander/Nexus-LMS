@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
-import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, UserCircleIcon } from '../components/Icons';
+import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, UserCircleIcon, AwardIcon } from '../components/Icons';
 import { GoogleGenAI } from "@google/genai";
 import * as api from '../supabaseApi';
 
@@ -184,6 +184,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
+  const isCurrentLessonComplete = currentLesson ? enrollment.completedLessonIds.includes(currentLesson.id) : false;
   
   const courseProgress = allLessons.length > 0 ? Math.round((enrollment.completedLessonIds.length / allLessons.length) * 100) : 0;
 
@@ -192,6 +193,35 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
       if (lessonIndex === 0) return true;
       const prevLesson = allLessons[lessonIndex - 1];
       return enrollment.completedLessonIds.includes(prevLesson.id);
+  };
+
+  const handleContinue = () => {
+    const nextLesson = allLessons[currentLessonIndex + 1];
+    if (nextLesson) {
+        handleSelectLesson(nextLesson)
+    } else {
+        onExit(); // Course finished
+    }
+  };
+
+  const handleMarkComplete = () => {
+    if (!currentLesson || currentLesson.type === LessonType.QUIZ || isCurrentLessonComplete) {
+        return;
+    }
+
+    const newCompletedIds = Array.from(new Set([...enrollment.completedLessonIds, currentLesson.id]));
+    const newProgress = allLessons.length > 0 ? Math.round((newCompletedIds.length / allLessons.length) * 100) : 0;
+    
+    const updatedEnrollment = { 
+        ...enrollment, 
+        completedLessonIds: newCompletedIds, 
+        progress: newProgress 
+    };
+    
+    onEnrollmentUpdate(updatedEnrollment);
+    
+    // Automatically move to the next lesson or exit if it's the last one
+    handleContinue();
   };
   
   const handleQuizSubmit = (answers: Record<string, number>) => {
@@ -229,34 +259,20 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     setLastQuizResult({ score, passed, passingScore: quizData.passingScore });
     setPlayerView('quiz_result');
   };
-
-  const handleContinue = () => {
-    const nextLesson = allLessons[currentLessonIndex + 1];
-    if (nextLesson) {
-        handleSelectLesson(nextLesson)
-    } else {
-        onExit(); // Course finished
-    }
-  };
   
   const handleSelectLesson = (lesson: Lesson) => {
-      const lessonIndex = allLessons.findIndex(l => l.id === lesson.id);
-      if (isLessonUnlocked(lessonIndex)) {
-        setCurrentLesson(lesson);
-        setPlayerView('lesson');
-        setIsPlayerSidebarOpen(false); // Close mobile sidebar on selection
+    const lessonIndex = allLessons.findIndex(l => l.id === lesson.id);
+    if (isLessonUnlocked(lessonIndex)) {
+      setCurrentLesson(lesson);
+      setPlayerView('lesson');
+      setLastQuizResult(null); // Clear any previous quiz result view
+      setIsPlayerSidebarOpen(false); // Close mobile sidebar on selection
 
-        let updatedEnrollment = { ...enrollment, lastAccessedLessonId: lesson.id };
-
-        // Mark non-quiz lessons as complete on view
-        if(lesson.type !== LessonType.QUIZ && !enrollment.completedLessonIds.includes(lesson.id)) {
-            const newCompletedIds = Array.from(new Set([...enrollment.completedLessonIds, lesson.id]));
-            const newProgress = allLessons.length > 0 ? Math.round((newCompletedIds.length / allLessons.length) * 100) : 0;
-            updatedEnrollment = { ...updatedEnrollment, completedLessonIds: newCompletedIds, progress: newProgress };
-        }
-        
-        onEnrollmentUpdate(updatedEnrollment);
+      // Only update the last accessed lesson ID if it's different
+      if (enrollment.lastAccessedLessonId !== lesson.id) {
+        onEnrollmentUpdate({ ...enrollment, lastAccessedLessonId: lesson.id });
       }
+    }
   };
 
   const handleSendMessage = async (message: string) => { /* ... same as original ... */ };
@@ -266,6 +282,8 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
       setChatHistory([{ id: 'bot-welcome', role: 'bot', content: `Hello! I'm Nicky. How can I help you with "${currentLesson?.title}"?` }]);
     }
   }, [sidebarTab, currentLesson?.title, chatHistory.length]);
+
+  const canComplete = currentLesson && currentLesson.type !== LessonType.QUIZ && !isCurrentLessonComplete;
 
   return (
     <div className="flex flex-col md:flex-row h-full bg-white dark:bg-gray-900">
@@ -311,22 +329,38 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
               <div /> // Spacer
             )}
 
-            {currentLessonIndex < allLessons.length - 1 ? (
-              <button
-                onClick={handleContinue}
-                disabled={!isLessonUnlocked(currentLessonIndex + 1)}
-                className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 transition-all text-lg flex items-center gap-2 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
-                title={!isLessonUnlocked(currentLessonIndex + 1) ? "Complete the current lesson to unlock" : "Go to next lesson"}
-              >
-                Next Lesson
-                {isLessonUnlocked(currentLessonIndex + 1) ? (
-                  <ChevronRightIcon className="w-5 h-5" />
-                ) : (
-                  <LockIcon className="w-5 h-5" />
-                )}
-              </button>
+            {canComplete ? (
+                <button
+                    onClick={handleMarkComplete}
+                    className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition-all text-lg flex items-center gap-2"
+                >
+                    Mark as Complete
+                    <CheckCircle2Icon className="w-5 h-5" />
+                </button>
+            ) : currentLessonIndex < allLessons.length - 1 ? (
+                 <button
+                    onClick={handleContinue}
+                    disabled={!isLessonUnlocked(currentLessonIndex + 1)}
+                    className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 transition-all text-lg flex items-center gap-2 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    title={!isLessonUnlocked(currentLessonIndex + 1) ? "Complete the current lesson to unlock" : "Go to next lesson"}
+                >
+                    Next Lesson
+                    {isLessonUnlocked(currentLessonIndex + 1) ? (
+                      <ChevronRightIcon className="w-5 h-5" />
+                    ) : (
+                      <LockIcon className="w-5 h-5" />
+                    )}
+                </button>
+            ) : isCurrentLessonComplete ? (
+                 <button
+                    onClick={onExit}
+                    className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-all text-lg flex items-center gap-2"
+                >
+                    Finish Course
+                    <AwardIcon className="w-5 h-5" />
+                </button>
             ) : (
-              <div /> // Spacer
+                <div /> // Spacer
             )}
           </div>
       </main>

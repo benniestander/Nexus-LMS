@@ -36,7 +36,6 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const loadAppData = useCallback(async (user: User) => {
-      setIsLoading(true);
       try {
         const data = await api.getInitialData(user);
         if (data) {
@@ -51,15 +50,12 @@ const App: React.FC = () => {
         }
       } catch (error) {
           console.error("Failed to load app data:", error);
-      } finally {
-          setIsLoading(false);
       }
   }, []);
   
   useEffect(() => {
-    // Rely solely on onAuthStateChange for session management.
-    // It fires once initially and then on every auth change.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setIsLoading(true);
         try {
             setSession(session);
             if (session) {
@@ -69,15 +65,14 @@ const App: React.FC = () => {
                     await loadAppData(userProfile);
                 } else {
                     console.error("User is authenticated but has no profile.");
-                    setIsLoading(false);
                 }
             } else {
                 setCurrentUser(null);
-                setIsLoading(false); // No user, stop loading.
             }
         } catch (error) {
             console.error("Error in auth state change:", error);
             setCurrentUser(null);
+        } finally {
             setIsLoading(false);
         }
     });
@@ -275,7 +270,7 @@ const App: React.FC = () => {
   }
 
   if (isLoading) {
-      return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading Nexus...</div>;
+      return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"><div className="bg-purple-600 text-white font-semibold px-6 py-3 rounded-lg">Loading Nexus...</div></div>;
   }
   
   if (!session) {
