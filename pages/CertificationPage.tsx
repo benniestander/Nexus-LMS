@@ -458,6 +458,8 @@ const CourseEditorPage: React.FC<{
     });
 
     const [editingLesson, setEditingLesson] = useState<{ lesson: Lesson, mIndex: number, lIndex: number } | null>(null);
+    const dragItem = useRef<any>(null);
+    const dragOverItem = useRef<any>(null);
 
     const updateCourseField = (field: keyof Course, value: any) => setCourse(prev => ({ ...prev, [field]: value }));
 
@@ -515,10 +517,6 @@ const CourseEditorPage: React.FC<{
         };
         onSave(finalCourse);
     };
-
-    // --- Drag and Drop Logic ---
-    const dragItem = useRef<any>(null);
-    const dragOverItem = useRef<any>(null);
 
     const handleDragStart = (e: React.DragEvent, params: any) => { dragItem.current = params; e.dataTransfer.effectAllowed = 'move'; }
     const handleDragEnter = (e: React.DragEvent, params: any) => { dragOverItem.current = params; }
