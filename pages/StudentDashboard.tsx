@@ -2,7 +2,11 @@ import React from 'react';
 import { Course, Enrollment, User, Role, EngagementData } from '../types';
 import { CourseCard } from '../components/CourseCard';
 import { UsersIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, PlusCircleIcon, LayoutDashboardIcon } from '../components/Icons';
-import { mockAdminDashboardStats, mockCoursePerformance, mockEngagementData, mockInstructorDashboardStats } from '../constants/mockData';
+
+// NOTE: Chart data is now derived from props or placeholder, not mock file.
+const generatePlaceholderChartData = (label: string, length = 6) => {
+    return Array.from({length}, (_, i) => ({ name: `${label} ${i+1}`, value: Math.floor(Math.random() * 400) + 50 }));
+}
 
 // Re-importing Chart components as they are not in separate files.
 // In a real app, these would be in their own files.
@@ -13,7 +17,7 @@ const SimpleBarChart: React.FC<{data: EngagementData[], color: string}> = ({ dat
             <div key={index} className="flex-1 flex flex-col items-center justify-end h-full">
                 <div 
                     className="w-3/4 rounded-t-md"
-                    style={{ height: `${(item.value / Math.max(...data.map(d => d.value))) * 100}%`, backgroundColor: color }}
+                    style={{ height: `${(item.value / Math.max(...data.map(d => d.value), 1)) * 100}%`, backgroundColor: color }}
                     title={`${item.name}: ${item.value}`}
                 ></div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.name}</p>
@@ -66,13 +70,13 @@ const StudentDashboardComponent: React.FC<{
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-12">
           <StatCard 
             icon={<BookOpenIcon className="w-8 h-8 text-white" />}
-            value={enrolledCourses.filter(c => getProgress(c.id) > 0 && getProgress(c.id) < 100).length}
+            value={enrollments.filter(e => e.progress > 0 && e.progress < 100).length}
             label="Courses in Progress"
             color="from-cyan-500 to-blue-500"
           />
            <StatCard 
             icon={<CheckCircle2Icon className="w-8 h-8 text-white" />}
-            value={enrolledCourses.filter(c => getProgress(c.id) === 100).length}
+            value={enrollments.filter(e => e.progress === 100).length}
             label="Courses Completed"
             color="from-green-500 to-emerald-600"
           />
@@ -122,10 +126,19 @@ const StudentDashboardComponent: React.FC<{
 const InstructorDashboard: React.FC<{
     user: User;
     courses: Course[];
+    enrollments: Enrollment[];
     onNavigate: (view: any) => void;
     onEditCourse: (course: Course) => void;
-}> = ({ user, courses, onNavigate, onEditCourse }) => {
+}> = ({ user, courses, enrollments, onNavigate, onEditCourse }) => {
     const instructorCourses = courses.filter(c => c.instructorId === user.id);
+    const instructorCourseIds = instructorCourses.map(c => c.id);
+    const instructorEnrollments = enrollments.filter(e => instructorCourseIds.includes(e.courseId));
+    
+    const totalStudents = new Set(instructorEnrollments.map(e => e.userId)).size;
+    const avgCompletion = instructorEnrollments.length > 0 
+        ? instructorEnrollments.reduce((acc, e) => acc + e.progress, 0) / instructorEnrollments.length 
+        : 0;
+
     return (
         <div className="p-4 md:p-8">
             <div className="text-center max-w-3xl mx-auto">
@@ -135,16 +148,16 @@ const InstructorDashboard: React.FC<{
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
-                <StatCard icon={<UsersIcon className="w-8 h-8" />} value={mockInstructorDashboardStats.totalStudents.value} label="Total Students" color="from-cyan-500 to-blue-500" />
+                <StatCard icon={<UsersIcon className="w-8 h-8" />} value={totalStudents} label="Total Students" color="from-cyan-500 to-blue-500" />
                 <StatCard icon={<BookOpenIcon className="w-8 h-8" />} value={instructorCourses.length} label="Your Courses" color="from-pink-500 to-rose-500" />
-                <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={`${mockInstructorDashboardStats.avgCompletion.value}%`} label="Avg. Completion" color="from-amber-500 to-orange-500" />
+                <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={`${Math.round(avgCompletion)}%`} label="Avg. Completion" color="from-amber-500 to-orange-500" />
             </div>
 
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Student Engagement</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">New enrollments over the last 6 months</p>
-                    <SimpleBarChart data={mockEngagementData} color="var(--brand-purple)" />
+                    <SimpleBarChart data={generatePlaceholderChartData('Month')} color="var(--brand-purple)" />
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
                     <div className="flex justify-between items-center mb-4">
@@ -183,7 +196,7 @@ const InstructorDashboard: React.FC<{
 
 // ===== ADMIN DASHBOARD =====
 
-const AdminDashboard: React.FC<{ user: User }> = ({ user }) => {
+const AdminDashboard: React.FC<{ user: User, courses: Course[], enrollments: Enrollment[], allUsers: User[] }> = ({ user, courses, enrollments, allUsers }) => {
     return (
         <div className="p-4 md:p-8">
             <div className="text-center max-w-3xl mx-auto">
@@ -193,21 +206,21 @@ const AdminDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
-                <StatCard icon={<UsersIcon className="w-8 h-8" />} value={mockAdminDashboardStats.totalUsers.value} label="Total Users" color="from-blue-600 to-violet-600" />
-                <StatCard icon={<BookOpenIcon className="w-8 h-8" />} value={mockAdminDashboardStats.totalCourses.value} label="Total Courses" color="from-pink-500 to-rose-500" />
-                <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={mockAdminDashboardStats.totalEnrollments.value.toLocaleString()} label="Total Enrollments" color="from-teal-400 to-cyan-600" />
+                <StatCard icon={<UsersIcon className="w-8 h-8" />} value={allUsers.length} label="Total Users" color="from-blue-600 to-violet-600" />
+                <StatCard icon={<BookOpenIcon className="w-8 h-8" />} value={courses.length} label="Total Courses" color="from-pink-500 to-rose-500" />
+                <StatCard icon={<BarChart2Icon className="w-8 h-8" />} value={enrollments.length.toLocaleString()} label="Total Enrollments" color="from-teal-400 to-cyan-600" />
             </div>
 
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">New User Signups</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Last 6 months</p>
-                    <SimpleBarChart data={mockEngagementData} color="var(--brand-blue)" />
+                    <SimpleBarChart data={generatePlaceholderChartData('Month')} color="var(--brand-blue)" />
                 </div>
                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Course Performance</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Average completion rate by category</p>
-                    <SimpleBarChart data={mockCoursePerformance} color="var(--brand-pink)" />
+                     <SimpleBarChart data={generatePlaceholderChartData('Course', 4)} color="var(--brand-pink)" />
                 </div>
             </div>
         </div>
@@ -226,11 +239,14 @@ interface DashboardProps {
 }
 
 export const StudentDashboard: React.FC<DashboardProps> = ({ user, courses, enrollments, onSelectCourse, onNavigate, onEditCourse }) => {
+  const allEnrollments = (window as any).__ALL_ENROLLMENTS__ || [];
+  const allUsers = (window as any).__ALL_USERS__ || [];
+
   if (user.role === Role.INSTRUCTOR) {
-    return <InstructorDashboard user={user} courses={courses} onNavigate={onNavigate} onEditCourse={onEditCourse} />;
+    return <InstructorDashboard user={user} courses={courses} enrollments={allEnrollments} onNavigate={onNavigate} onEditCourse={onEditCourse} />;
   }
   if (user.role === Role.ADMIN) {
-    return <AdminDashboard user={user} />;
+    return <AdminDashboard user={user} courses={courses} enrollments={allEnrollments} allUsers={allUsers} />;
   }
   return <StudentDashboardComponent user={user} courses={courses} enrollments={enrollments} onSelectCourse={onSelectCourse} />;
 };

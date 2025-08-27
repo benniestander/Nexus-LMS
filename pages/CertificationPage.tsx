@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, HistoryLog, HistoryAction, LiveSession } from '../types';
 import { AwardIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, ChevronDownIcon, ChevronUpIcon, EditIcon, FileTextIcon, GripVerticalIcon, PlusCircleIcon, SettingsIcon, Trash2Icon, UsersIcon, PlayCircleIcon, ClipboardListIcon, XIcon, SearchIcon, DownloadIcon, MailIcon, SendIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, MessageSquareIcon, VideoIcon } from '../components/Icons';
-import { mockEngagementData } from '../constants/mockData';
+// FIX: Removed unused import from a non-existent file.
 import { RichTextEditor } from '../components/RichTextEditor';
 import { CourseCard } from '../components/CourseCard';
 import { ProgressBar } from '../components/ProgressBar';
@@ -706,13 +706,15 @@ const CourseEditor: React.FC<{ course: Course, onSave: (course: Course) => void,
     };
     
     const addModule = () => {
-        const newModule: Module = { id: `m-${Date.now()}`, courseId: course.id, title: "New Module", lessons: [] };
+        const newModule: Module = { id: `m-${Date.now()}`, courseId: course.id, title: "New Module", lessons: [], order: course.modules.length };
         setCourse(prev => ({ ...prev, modules: [...prev.modules, newModule]}));
         setExpandedModules(prev => ({...prev, [newModule.id]: true}));
     };
 
     const addLesson = (moduleId: string) => {
-        const newLesson: Lesson = { id: `l-${Date.now()}`, moduleId, title: "New Lesson", type: LessonType.TEXT, duration: 5, content: { text: "Start writing your lesson here." } };
+        const module = course.modules.find(m => m.id === moduleId);
+        if (!module) return;
+        const newLesson: Lesson = { id: `l-${Date.now()}`, moduleId, title: "New Lesson", type: LessonType.TEXT, duration: 5, content: { text: "Start writing your lesson here." }, order: module.lessons.length };
         setCourse(prev => ({ ...prev, modules: prev.modules.map(m => m.id === moduleId ? {...m, lessons: [...m.lessons, newLesson]} : m) }));
         setSelectedItem({ type: 'lesson', moduleId, lessonId: newLesson.id });
     };

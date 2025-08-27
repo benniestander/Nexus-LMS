@@ -1,3 +1,4 @@
+
 export enum Role {
   STUDENT = 'student',
   INSTRUCTOR = 'instructor',
@@ -47,6 +48,8 @@ export interface Lesson {
     quizData?: QuizData;
   };
   duration: number; // in minutes
+  // FIX: Added 'order' property to allow sorting of lessons.
+  order: number;
 }
 
 export interface Module {
@@ -54,6 +57,8 @@ export interface Module {
   courseId: string;
   title: string;
   lessons: Lesson[];
+  // FIX: Added 'order' property to allow sorting of modules.
+  order: number;
 }
 
 export interface Course {

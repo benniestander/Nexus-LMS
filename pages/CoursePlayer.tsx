@@ -1,11 +1,12 @@
 
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, ChatMessage, DiscussionPost } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
 import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, MessageSquareIcon, BookOpenIcon, SendIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon } from '../components/Icons';
 import { GoogleGenAI } from "@google/genai";
-import { mockDiscussions } from '../constants/mockData';
+import * as api from '../supabaseApi';
 
 const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
 
@@ -75,21 +76,32 @@ const QuizResult: React.FC<{ result: { score: number; passed: boolean; passingSc
 
 // --- Discussion View ---
 const DiscussionView: React.FC<{ lessonId: string, user: User }> = ({ lessonId, user }) => {
-    const [posts, setPosts] = useState(() => mockDiscussions.filter(p => p.lessonId === lessonId));
+    const [posts, setPosts] = useState<DiscussionPost[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [newPost, setNewPost] = useState('');
 
-    const handlePost = () => {
+    useEffect(() => {
+        const fetchDiscussions = async () => {
+            setIsLoading(true);
+            const discussionPosts = await api.getDiscussions(lessonId);
+            setPosts(discussionPosts);
+            setIsLoading(false);
+        }
+        fetchDiscussions();
+    }, [lessonId]);
+
+    const handlePost = async () => {
         if (!newPost.trim()) return;
-        const post: DiscussionPost = {
-            id: `p-${Date.now()}`,
+        const postData = {
             lessonId,
-            author: { id: user.id, firstName: user.firstName, lastName: user.lastName, avatar: user.avatar },
-            content: newPost,
-            timestamp: new Date().toISOString(),
-            replies: []
+            authorId: user.id,
+            content: newPost.trim()
         };
-        setPosts(prev => [post, ...prev]);
-        setNewPost('');
+        const savedPost = await api.postDiscussion(postData);
+        if (savedPost) {
+             setPosts(prev => [savedPost, ...prev]);
+             setNewPost('');
+        }
     };
 
     return (
@@ -105,19 +117,24 @@ const DiscussionView: React.FC<{ lessonId: string, user: User }> = ({ lessonId, 
                 <button onClick={handlePost} className="mt-2 bg-pink-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-pink-600">Post</button>
             </div>
             <div className="flex-grow overflow-y-auto space-y-4">
-                {posts.map(post => (
-                    <div key={post.id} className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
-                        <div className="flex items-start gap-3">
-                            <img src={post.author.avatar} alt={post.author.firstName} className="w-8 h-8 rounded-full" />
-                            <div>
-                                <p className="font-semibold text-sm">{post.author.firstName} {post.author.lastName}</p>
-                                <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
-                                <p className="mt-2 text-gray-800 dark:text-gray-200">{post.content}</p>
+                {isLoading ? <p className="text-center text-gray-500">Loading discussions...</p> : 
+                 posts.length > 0 ? (
+                    posts.map(post => (
+                        <div key={post.id} className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <img src={post.author.avatar} alt={post.author.firstName} className="w-8 h-8 rounded-full" />
+                                <div>
+                                    <p className="font-semibold text-sm">{post.author.firstName} {post.author.lastName}</p>
+                                    <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
+                                    <p className="mt-2 text-gray-800 dark:text-gray-200">{post.content}</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-                 {posts.length === 0 && <p className="text-center text-gray-500">No discussions yet. Be the first to post!</p>}
+                    ))
+                 ) : (
+                    <p className="text-center text-gray-500">No discussions yet. Be the first to post!</p>
+                 )
+                }
             </div>
         </div>
     );
@@ -167,9 +184,10 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
   const currentLessonIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
   const currentModule = currentLesson ? course.modules.find(m => m.id === currentLesson.moduleId) : null;
   
-  const courseProgress = Math.round((enrollment.completedLessonIds.length / allLessons.length) * 100);
+  const courseProgress = allLessons.length > 0 ? Math.round((enrollment.completedLessonIds.length / allLessons.length) * 100) : 0;
 
   const isLessonUnlocked = (lessonIndex: number) => {
+      if (lessonIndex < 0 || lessonIndex >= allLessons.length) return false;
       if (lessonIndex === 0) return true;
       const prevLesson = allLessons[lessonIndex - 1];
       return enrollment.completedLessonIds.includes(prevLesson.id);
@@ -183,11 +201,30 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     const passed = score >= quizData.passingScore;
     
     const wasAlreadyPassed = enrollment.completedLessonIds.includes(currentLesson.id);
+
+    const newQuizScores = {
+        ...enrollment.quizScores,
+        [currentLesson.id]: {
+            score: Math.max(enrollment.quizScores[currentLesson.id]?.score || 0, score),
+            passed: enrollment.quizScores[currentLesson.id]?.passed || passed
+        }
+    };
+    
+    let newCompletedIds = enrollment.completedLessonIds;
     if (passed && !wasAlreadyPassed) {
-      const newCompletedIds = Array.from(new Set([...enrollment.completedLessonIds, currentLesson.id]));
-      const newEnrollment = { ...enrollment, completedLessonIds: newCompletedIds };
-      onEnrollmentUpdate(newEnrollment);
+      newCompletedIds = Array.from(new Set([...enrollment.completedLessonIds, currentLesson.id]));
     }
+    
+    const newProgress = allLessons.length > 0 ? Math.round((newCompletedIds.length / allLessons.length) * 100) : 0;
+
+    const newEnrollment = { 
+        ...enrollment, 
+        completedLessonIds: newCompletedIds,
+        quizScores: newQuizScores,
+        progress: newProgress
+    };
+    onEnrollmentUpdate(newEnrollment);
+
     setLastQuizResult({ score, passed, passingScore: quizData.passingScore });
     setPlayerView('quiz_result');
   };
@@ -208,13 +245,16 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
         setPlayerView('lesson');
         setIsPlayerSidebarOpen(false); // Close mobile sidebar on selection
 
+        let updatedEnrollment = { ...enrollment, lastAccessedLessonId: lesson.id };
+
         // Mark non-quiz lessons as complete on view
         if(lesson.type !== LessonType.QUIZ && !enrollment.completedLessonIds.includes(lesson.id)) {
             const newCompletedIds = Array.from(new Set([...enrollment.completedLessonIds, lesson.id]));
-            onEnrollmentUpdate({ ...enrollment, completedLessonIds: newCompletedIds, lastAccessedLessonId: lesson.id });
-        } else {
-            onEnrollmentUpdate({ ...enrollment, lastAccessedLessonId: lesson.id });
+            const newProgress = allLessons.length > 0 ? Math.round((newCompletedIds.length / allLessons.length) * 100) : 0;
+            updatedEnrollment = { ...updatedEnrollment, completedLessonIds: newCompletedIds, progress: newProgress };
         }
+        
+        onEnrollmentUpdate(updatedEnrollment);
       }
   };
 
@@ -257,12 +297,36 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
               ) : null}
           </div>
 
-          <div className="p-4 sm:p-8 pt-6 flex justify-center">
-             {currentLesson && currentLessonIndex < allLessons.length - 1 && (
-                <button onClick={handleContinue} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 transition-all text-lg flex items-center gap-2">
-                    Next Lesson <ChevronRightIcon className="w-5 h-5" />
-                </button>
-             )}
+          <div className="p-4 sm:p-8 pt-6 flex justify-between items-center">
+            {currentLessonIndex > 0 ? (
+              <button
+                onClick={() => handleSelectLesson(allLessons[currentLessonIndex - 1])}
+                className="bg-white dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-bold py-3 px-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all text-lg flex items-center gap-2"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+                Previous
+              </button>
+            ) : (
+              <div /> // Spacer
+            )}
+
+            {currentLessonIndex < allLessons.length - 1 ? (
+              <button
+                onClick={handleContinue}
+                disabled={!isLessonUnlocked(currentLessonIndex + 1)}
+                className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 transition-all text-lg flex items-center gap-2 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+                title={!isLessonUnlocked(currentLessonIndex + 1) ? "Complete the current lesson to unlock" : "Go to next lesson"}
+              >
+                Next Lesson
+                {isLessonUnlocked(currentLessonIndex + 1) ? (
+                  <ChevronRightIcon className="w-5 h-5" />
+                ) : (
+                  <LockIcon className="w-5 h-5" />
+                )}
+              </button>
+            ) : (
+              <div /> // Spacer
+            )}
           </div>
       </main>
 

@@ -4,12 +4,11 @@ import { ChevronDownIcon, UserCircleIcon, SettingsIcon, BellIcon, LogOutIcon, Me
 
 interface HeaderProps {
   user: User;
-  onRoleChange: (role: Role) => void;
   onLogout: () => void;
   onToggleMobileMenu: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ user, onRoleChange, onLogout, onToggleMobileMenu }) => {
+export const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleMobileMenu }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
@@ -22,20 +21,6 @@ export const Header: React.FC<HeaderProps> = ({ user, onRoleChange, onLogout, on
           >
             <MenuIcon className="w-6 h-6" />
         </button>
-        {/* Role Switcher for Demo */}
-        <div className="hidden sm:block">
-            <label htmlFor="role-switcher" className="text-sm font-medium text-gray-500 dark:text-gray-400 mr-2">View as:</label>
-            <select 
-                id="role-switcher"
-                value={user.role} 
-                onChange={(e) => onRoleChange(e.target.value as Role)}
-                className="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-pink-500 focus:border-pink-500 p-2"
-            >
-                <option value={Role.STUDENT}>Student</option>
-                <option value={Role.INSTRUCTOR}>Instructor</option>
-                <option value={Role.ADMIN}>Admin</option>
-            </select>
-        </div>
       </div>
       <div className="flex items-center gap-4">
         <button className="relative text-gray-500 dark:text-gray-400 hover:text-pink-500 transition-colors">

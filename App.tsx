@@ -1,47 +1,103 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
-import { mockUser, mockCourses, mockEnrollments, mockAdmin, mockInstructor, allMockUsers, mockConversations, mockMessages, mockCalendarEvents, mockHistoryLogs, mockLiveSessions } from './constants/mockData';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
 import { StudentDashboard } from './pages/StudentDashboard';
 import CoursePlayer from './pages/CoursePlayer';
 import { ManagementPages } from './pages/CertificationPage';
-
+import { supabase } from './supabaseClient';
+import { Auth } from './components/Auth';
+import * as api from './supabaseApi';
 
 type View = SidebarView;
 
 const App: React.FC = () => {
-  const [allUsers, setAllUsers] = useState<User[]>(allMockUsers);
-  const [courses, setCourses] = useState<Course[]>(mockCourses);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>(mockEnrollments);
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
-  const [historyLogs, setHistoryLogs] = useState<HistoryLog[]>(mockHistoryLogs);
-  const [liveSessions, setLiveSessions] = useState<LiveSession[]>(mockLiveSessions);
+  const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // --- Live Data States ---
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [historyLogs, setHistoryLogs] = useState<HistoryLog[]>([]);
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
 
-  const [currentUser, setCurrentUser] = useState<User>(mockUser);
+  // --- UI State ---
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const loadAppData = useCallback(async (user: User) => {
+      setIsLoading(true);
+      const data = await api.getInitialData(user);
+      if (data) {
+          setCourses(data.courses);
+          setEnrollments(data.enrollments);
+          setAllUsers(data.allUsers);
+          setConversations(data.conversations);
+          setMessages(data.messages);
+          setCalendarEvents(data.calendarEvents);
+          setHistoryLogs(data.historyLogs);
+          setLiveSessions(data.liveSessions);
+      }
+      setIsLoading(false);
+  }, []);
+  
+  useEffect(() => {
+    const fetchInitialSessionAndProfile = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+
+        if (session) {
+            const userProfile = await api.getProfile(session.user.id, session.user.email!);
+            setCurrentUser(userProfile);
+            if(userProfile) {
+              await loadAppData(userProfile);
+            } else {
+              setIsLoading(false);
+            }
+        } else {
+            setIsLoading(false);
+        }
+    };
+    
+    fetchInitialSessionAndProfile();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      if (session) {
+        const userProfile = await api.getProfile(session.user.id, session.user.email!);
+        setCurrentUser(userProfile);
+        if(userProfile) {
+            await loadAppData(userProfile);
+        } else {
+            setIsLoading(false)
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadAppData]);
+
+  const refetchData = useCallback(() => {
+    if (currentUser) {
+      loadAppData(currentUser);
+    }
+  }, [currentUser, loadAppData]);
+  
   const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  const handleRoleChange = (role: Role) => {
-    if (role === Role.STUDENT) setCurrentUser(mockUser);
-    if (role === Role.INSTRUCTOR) setCurrentUser(mockInstructor);
-    if (role === Role.ADMIN) setCurrentUser(mockAdmin);
-    setCurrentView('dashboard');
-    setSelectedCourse(null);
-    setEditingCourse(null);
-    closeMobileMenu();
-  };
-
-  const handleLogout = () => {
-    handleRoleChange(Role.STUDENT);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
   
   const handleNavigate = (view: View) => {
@@ -71,15 +127,13 @@ const App: React.FC = () => {
     setCurrentView('my-courses');
   }
 
-  const handleSaveCourse = (updatedCourse: Course) => {
-    setCourses(prev => {
-        const courseExists = prev.some(c => c.id === updatedCourse.id);
-        if (courseExists) {
-            return prev.map(c => c.id === updatedCourse.id ? updatedCourse : c);
-        } else {
-            return [...prev, updatedCourse];
-        }
-    });
+  const handleSaveCourse = async (updatedCourse: Course) => {
+    const result = await api.saveCourse(updatedCourse);
+    if(result.success) {
+      refetchData();
+    } else {
+      alert("Error saving course. Please check the console for details.");
+    }
     handleExitCourseEditor();
   };
 
@@ -88,68 +142,53 @@ const App: React.FC = () => {
     setCurrentView('dashboard');
   };
 
-  const handleEnrollmentUpdate = (updatedEnrollment: Enrollment) => {
+  const handleEnrollmentUpdate = async (updatedEnrollment: Enrollment) => {
     setEnrollments(prev => prev.map(e => e.courseId === updatedEnrollment.courseId && e.userId === updatedEnrollment.userId ? updatedEnrollment : e));
+    await api.updateEnrollment(updatedEnrollment);
   }
 
-  const handleSendMessage = (recipientIds: string[], subject: string, content: string) => {
-      const timestamp = new Date().toISOString();
-      let newMessages: Message[] = [];
-      let updatedConversations = [...conversations];
-
-      recipientIds.forEach(recipientId => {
-          let convo = updatedConversations.find(c => 
-              c.participantIds.includes(currentUser.id) && c.participantIds.includes(recipientId)
-          );
-
-          if (convo) {
-              convo.lastMessageTimestamp = timestamp;
-          } else {
-              convo = {
-                  id: `convo-${Date.now()}-${Math.random()}`,
-                  participantIds: [currentUser.id, recipientId],
-                  lastMessageTimestamp: timestamp,
-              };
-              updatedConversations.push(convo);
-          }
-
-          const newMessage: Message = {
-              id: `msg-${Date.now()}-${Math.random()}`,
-              conversationId: convo.id,
-              senderId: currentUser.id,
-              subject: subject || undefined,
-              content,
-              timestamp,
-              isRead: false,
-          };
-          newMessages.push(newMessage);
-      });
-      
-      setMessages(prev => [...prev, ...newMessages]);
-      setConversations(updatedConversations);
+  const handleSendMessage = async (recipientIds: string[], subject: string, content: string) => {
+    if(!currentUser) return;
+    // Simplified: assumes 1-on-1, finds or creates convo
+    for(const recipientId of recipientIds) {
+      let convo = conversations.find(c => c.participantIds.includes(currentUser.id) && c.participantIds.includes(recipientId));
+      if (!convo) {
+        // Create conversation if it doesn't exist
+        const { data: newConvoData } = await supabase.from('conversations').insert({ participant_ids: [currentUser.id, recipientId] }).select().single();
+        if (newConvoData) {
+            // FIX: Use the exported snakeToCamel function to convert the new conversation data.
+            convo = api.snakeToCamel(newConvoData);
+            setConversations(prev => [...prev, convo!]);
+        }
+      }
+      if (convo) {
+        const newMessage = {
+            conversationId: convo.id,
+            senderId: currentUser.id,
+            subject,
+            content,
+            timestamp: new Date().toISOString()
+        };
+        const savedMessage = await api.sendMessage(newMessage);
+        if (savedMessage) {
+            setMessages(prev => [...prev, savedMessage]);
+        }
+      }
+    }
   };
   
   const handleUpdateMessages = (updatedMessages: Message[]) => {
       setMessages(updatedMessages);
+      // In a real app, you might only update the changed messages in Supabase
   };
 
-  const handleScheduleSession = (session: LiveSession) => {
-    // Add to live sessions list
-    setLiveSessions(prev => [...prev, session]);
-
-    // Also add to calendar for visibility
-    const newCalendarEvent: CalendarEvent = {
-        id: `evt-${session.id}`,
-        date: session.dateTime.split('T')[0], // YYYY-MM-DD
-        title: session.title,
-        courseId: session.audience !== 'all' ? session.audience : undefined,
-        type: 'live_session',
-    };
-    setCalendarEvents(prev => [...prev, newCalendarEvent]);
+  const handleScheduleSession = async (session: Omit<LiveSession, 'id'>) => {
+    await api.scheduleSession(session);
+    refetchData(); // Re-fetch to get new session and calendar event
   };
-
 
   const getEnrollmentForCourse = (courseId: string): Enrollment => {
+      if (!currentUser) throw new Error("User not logged in");
       const existingEnrollment = enrollments.find(e => e.courseId === courseId && e.userId === currentUser.id);
       if (existingEnrollment) return existingEnrollment;
       
@@ -161,10 +200,13 @@ const App: React.FC = () => {
           quizScores: {},
       };
       setEnrollments(prev => [...prev, newEnrollment]);
+      api.updateEnrollment(newEnrollment); // Create it in DB
       return newEnrollment;
   };
 
   const renderContent = () => {
+    if (!currentUser) return null;
+
     if (editingCourse) {
         return (
             <ManagementPages
@@ -195,7 +237,7 @@ const App: React.FC = () => {
              <StudentDashboard
               user={currentUser}
               courses={courses}
-              enrollments={enrollments}
+              enrollments={enrollments.filter(e => e.userId === currentUser.id)}
               onSelectCourse={handleSelectCourse}
               onNavigate={handleNavigate}
               onEditCourse={handleEditCourse}
@@ -224,6 +266,18 @@ const App: React.FC = () => {
     )
   }
 
+  if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading Nexus...</div>;
+  }
+  
+  if (!session) {
+      return <Auth />;
+  }
+
+  if (!currentUser) {
+      return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">Loading your profile...</div>;
+  }
+
   return (
     <div className="min-h-screen flex">
       <Sidebar 
@@ -242,7 +296,7 @@ const App: React.FC = () => {
         ></div>
       )}
       <div className="flex-1 flex flex-col">
-        <Header user={currentUser} onRoleChange={handleRoleChange} onLogout={handleLogout} onToggleMobileMenu={handleToggleMobileMenu} />
+        <Header user={currentUser} onLogout={handleLogout} onToggleMobileMenu={handleToggleMobileMenu} />
         <main className="flex-1 overflow-y-auto h-[calc(100vh-80px)]">
           {renderContent()}
         </main>
