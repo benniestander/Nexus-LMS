@@ -42,13 +42,24 @@ export const getProfile = async (userId: string): Promise<User | null> => {
 
 export const getInitialData = async (user: User) => {
     try {
-        // 1. Define role-based queries and independent queries
+        // 1. Define role-based queries for all sensitive/user-specific data
         const enrollmentsPromise = user.role === Role.ADMIN
             ? supabase.from('enrollments').select('*')
             : supabase.from('enrollments').select('*').eq('user_id', user.id);
         
+        const conversationsPromise = user.role === Role.ADMIN
+            ? supabase.from('conversations').select('*')
+            : supabase.from('conversations').select('*').contains('participant_ids', [user.id]);
+            
+        const calendarEventsPromise = user.role === Role.ADMIN
+            ? supabase.from('calendar_events').select('*')
+            : supabase.from('calendar_events').select('*').eq('user_id', user.id);
+
+        const historyLogsPromise = user.role === Role.ADMIN
+            ? supabase.from('history_logs').select('*').order('timestamp', { ascending: false })
+            : supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false });
+
         // For non-admins, RLS policies should restrict which users they can see.
-        // The app currently needs this for the user management page and messaging.
         const usersPromise = supabase.from('users_view').select('*');
 
         // 2. Fetch base data in parallel
@@ -69,9 +80,9 @@ export const getInitialData = async (user: User) => {
             supabase.from('lessons').select('*'),
             enrollmentsPromise,
             usersPromise,
-            supabase.from('conversations').select('*').contains('participant_ids', [user.id]),
-            supabase.from('calendar_events').select('*').eq('user_id', user.id),
-            supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
+            conversationsPromise,
+            calendarEventsPromise,
+            historyLogsPromise,
             supabase.from('live_sessions').select('*'),
             supabase.from('categories').select('*'),
         ]);
@@ -85,11 +96,16 @@ export const getInitialData = async (user: User) => {
             }
         }
         
-        // 4. Fetch dependent data (messages) based on the user's conversations
+        // 4. Fetch dependent data (messages) based on role
         const conversationIds = (conversationsRes.data || []).map(c => c.id);
-        const messagesRes = conversationIds.length > 0
-            ? await supabase.from('messages').select('*').in('conversation_id', conversationIds)
-            : { data: [], error: null };
+        let messagesRes;
+        if (user.role === Role.ADMIN) {
+            messagesRes = await supabase.from('messages').select('*');
+        } else {
+             messagesRes = conversationIds.length > 0
+                ? await supabase.from('messages').select('*').in('conversation_id', conversationIds)
+                : { data: [], error: null };
+        }
             
         if (messagesRes.error) throw messagesRes.error;
 
