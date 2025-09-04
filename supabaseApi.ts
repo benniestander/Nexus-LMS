@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
+import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 
 // ====================================================================================
 // ===== DATA TRANSFORMATION UTILS
@@ -42,7 +42,16 @@ export const getProfile = async (userId: string): Promise<User | null> => {
 
 export const getInitialData = async (user: User) => {
     try {
-        // 1. Fetch all base data in parallel
+        // 1. Define role-based queries and independent queries
+        const enrollmentsPromise = user.role === Role.ADMIN
+            ? supabase.from('enrollments').select('*')
+            : supabase.from('enrollments').select('*').eq('user_id', user.id);
+        
+        // For non-admins, RLS policies should restrict which users they can see.
+        // The app currently needs this for the user management page and messaging.
+        const usersPromise = supabase.from('users_view').select('*');
+
+        // 2. Fetch base data in parallel
         const [
             coursesRes, 
             modulesRes, 
@@ -50,7 +59,6 @@ export const getInitialData = async (user: User) => {
             enrollmentsRes,
             usersRes,
             conversationsRes,
-            messagesRes,
             calendarEventsRes,
             historyLogsRes,
             liveSessionsRes,
@@ -59,29 +67,33 @@ export const getInitialData = async (user: User) => {
             supabase.from('courses').select('*, instructor:profiles!instructor_id(first_name, last_name)'),
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
-            supabase.from('enrollments').select('*'),
-            supabase.from('users_view').select('*'), // Fetch from view to get emails
+            enrollmentsPromise,
+            usersPromise,
             supabase.from('conversations').select('*').contains('participant_ids', [user.id]),
-            supabase.from('messages').select('*'),
             supabase.from('calendar_events').select('*').eq('user_id', user.id),
             supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
             supabase.from('live_sessions').select('*'),
             supabase.from('categories').select('*'),
         ]);
 
-        if (coursesRes.error) throw coursesRes.error;
-        if (modulesRes.error) throw modulesRes.error;
-        if (lessonsRes.error) throw lessonsRes.error;
-        if (enrollmentsRes.error) throw enrollmentsRes.error;
-        if (usersRes.error) throw usersRes.error;
-        if (conversationsRes.error) throw conversationsRes.error;
+        // 3. Centralized error checking for the first batch
+        const firstBatchResults = { coursesRes, modulesRes, lessonsRes, enrollmentsRes, usersRes, conversationsRes, calendarEventsRes, historyLogsRes, liveSessionsRes, categoriesRes };
+        for (const [key, result] of Object.entries(firstBatchResults)) {
+            if (result.error) {
+                console.error(`Error fetching ${key}:`, result.error);
+                throw result.error;
+            }
+        }
+        
+        // 4. Fetch dependent data (messages) based on the user's conversations
+        const conversationIds = (conversationsRes.data || []).map(c => c.id);
+        const messagesRes = conversationIds.length > 0
+            ? await supabase.from('messages').select('*').in('conversation_id', conversationIds)
+            : { data: [], error: null };
+            
         if (messagesRes.error) throw messagesRes.error;
-        if (calendarEventsRes.error) throw calendarEventsRes.error;
-        if (historyLogsRes.error) throw historyLogsRes.error;
-        if (liveSessionsRes.error) throw liveSessionsRes.error;
-        if (categoriesRes.error) throw categoriesRes.error;
 
-        // 2. Transform and assemble data
+        // 5. Transform and assemble the final data structure
         const lessons: Lesson[] = snakeToCamel(lessonsRes.data);
         const modules: Module[] = snakeToCamel(modulesRes.data).map((module: any) => ({
             ...module,
@@ -104,16 +116,12 @@ export const getInitialData = async (user: User) => {
 
         const allUsers: User[] = snakeToCamel(usersRes.data);
         
-        // Filter messages based on fetched conversations for the user
-        const conversationIds = new Set(conversationsRes.data.map(c => c.id));
-        const relevantMessages = messagesRes.data.filter(m => conversationIds.has(m.conversation_id));
-
         return {
             courses,
             enrollments: snakeToCamel(enrollmentsRes.data),
             allUsers,
             conversations: snakeToCamel(conversationsRes.data),
-            messages: snakeToCamel(relevantMessages),
+            messages: snakeToCamel(messagesRes.data),
             calendarEvents: snakeToCamel(calendarEventsRes.data),
             historyLogs: snakeToCamel(historyLogsRes.data),
             liveSessions: snakeToCamel(liveSessionsRes.data),

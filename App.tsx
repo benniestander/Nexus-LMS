@@ -123,14 +123,14 @@ const App: React.FC = () => {
   // Effect for handling live auth changes (e.g., logout in another tab).
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // If the user logs out and there was previously a user session.
-      if (event === 'SIGNED_OUT' && authState.status === 'AUTHENTICATED') {
+      // If the user logs out from anywhere.
+      if (event === 'SIGNED_OUT') {
         authDispatch({ type: 'LOGOUT' });
         setViewAsRole(null);
       }
-      // If a user signs in after the initial load (e.g., in another tab).
-      // A full reload is the most reliable way to ensure a clean state.
-      if (event === 'SIGNED_IN' && authState.status === 'UNAUTHENTICATED') {
+      // If a user signs in after the initial load (e.g., in another tab),
+      // and this tab doesn't have a user, reload to get a fresh state.
+      if (event === 'SIGNED_IN' && !authState.user) {
         window.location.reload();
       }
     });
@@ -138,7 +138,7 @@ const App: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [authState.status]);
+  }, [authState.user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
