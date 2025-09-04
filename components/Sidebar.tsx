@@ -1,7 +1,7 @@
-import React from 'react';
-import { Role } from '../types';
+import React, { useState } from 'react';
+import { Role, Category } from '../types';
 import { 
-  LayoutDashboardIcon, LibraryIcon, UserCircleIcon, SettingsIcon, PlayCircleIcon, AwardIcon, type IconProps, UsersIcon, BarChart2Icon, BookOpenIcon, LogOutIcon, XIcon, MailIcon, CalendarIcon, HistoryIcon, VideoIcon, LifeBuoyIcon 
+  LayoutDashboardIcon, LibraryIcon, UserCircleIcon, SettingsIcon, PlayCircleIcon, AwardIcon, type IconProps, UsersIcon, BarChart2Icon, BookOpenIcon, LogOutIcon, XIcon, MailIcon, CalendarIcon, HistoryIcon, VideoIcon, LifeBuoyIcon, ChevronDownIcon, ChevronUpIcon 
 } from './Icons';
 
 // FIX: Added 'course-editor' as a valid view type. It's an internal view like 'player'.
@@ -22,6 +22,61 @@ export type View =
   | 'help'
   | 'course-editor'; // internal view
 
+// New nested type for the tree structure
+interface CategoryNode extends Category {
+    children: CategoryNode[];
+}
+
+// Props for the recursive category item component
+interface CategoryNavItemProps {
+    categoryNode: CategoryNode;
+    onSelectCategory: (id: string | null) => void;
+    selectedCategoryId: string | null;
+    level: number;
+}
+
+const CategoryNavItem: React.FC<CategoryNavItemProps> = ({ categoryNode, onSelectCategory, selectedCategoryId, level }) => {
+    const [isOpen, setIsOpen] = useState(true); // Default to open
+    const isActive = selectedCategoryId === categoryNode.id;
+    const hasChildren = categoryNode.children.length > 0;
+
+    return (
+        <li>
+            <div 
+              className={`flex items-center justify-between p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group ${isActive ? 'bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400' : ''}`}
+              style={{ paddingLeft: `${12 + level * 16}px`}}
+            >
+                <a
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); onSelectCategory(categoryNode.id); }}
+                  className="flex-grow font-semibold text-sm"
+                >
+                    {categoryNode.name}
+                </a>
+                {hasChildren && (
+                    <button onClick={() => setIsOpen(!isOpen)} className="p-1">
+                        {isOpen ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                    </button>
+                )}
+            </div>
+            {hasChildren && isOpen && (
+                <ul className="pl-2">
+                    {categoryNode.children.map(childNode => (
+                        <CategoryNavItem 
+                            key={childNode.id}
+                            categoryNode={childNode}
+                            onSelectCategory={onSelectCategory}
+                            selectedCategoryId={selectedCategoryId}
+                            level={level + 1}
+                        />
+                    ))}
+                </ul>
+            )}
+        </li>
+    );
+};
+
+
 interface SidebarProps {
   userRole: Role;
   viewAsRole: Role;
@@ -31,6 +86,9 @@ interface SidebarProps {
   isMobileMenuOpen: boolean;
   closeMenu: () => void;
   onLogout: () => void;
+  categories: Category[];
+  onSelectCategory: (id: string | null) => void;
+  selectedCategoryId: string | null;
 }
 
 const NavItem: React.FC<{ icon: React.ReactElement<IconProps>; label: string; active?: boolean; onClick?: () => void }> = ({ icon, label, active, onClick }) => (
@@ -46,7 +104,7 @@ const NavItem: React.FC<{ icon: React.ReactElement<IconProps>; label: string; ac
   </li>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNavigate, currentView, isMobileMenuOpen, closeMenu, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNavigate, currentView, isMobileMenuOpen, closeMenu, onLogout, categories, onSelectCategory, selectedCategoryId }) => {
 
   const navItems = {
     [Role.STUDENT]: [
@@ -87,6 +145,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
   const commonItems = [
       { view: 'profile', icon: <UserCircleIcon />, label: 'Profile' },
   ];
+
+  // Helper to build the category tree
+  const buildCategoryTree = (items: Category[], parentId: string | null = null): CategoryNode[] => {
+      return items
+          .filter(item => item.parentId === parentId)
+          .map(item => ({
+              ...item,
+              children: buildCategoryTree(items, item.id)
+          }));
+  };
+  
+  const categoryTree = buildCategoryTree(categories);
 
   const getNavItems = () => {
     // Display navigation based on the role the user is currently viewing as.
@@ -131,6 +201,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
             />
           ))}
         </ul>
+        
+        <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Categories</p>
+            <ul>
+                <li>
+                   <a 
+                      href="#" 
+                      onClick={(e) => { e.preventDefault(); onSelectCategory(null); }}
+                      className={`flex items-center p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group font-semibold text-sm ${selectedCategoryId === null && currentView === 'dashboard' ? 'bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400' : ''}`}
+                    >
+                      <LibraryIcon className={`w-5 h-5 mr-3 ${selectedCategoryId === null && currentView === 'dashboard' ? 'text-pink-600 dark:text-pink-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                      All Courses
+                    </a>
+                </li>
+                {categoryTree.map(categoryNode => (
+                    <CategoryNavItem 
+                        key={categoryNode.id}
+                        categoryNode={categoryNode}
+                        onSelectCategory={onSelectCategory}
+                        selectedCategoryId={selectedCategoryId}
+                        level={0}
+                    />
+                ))}
+            </ul>
+        </div>
+
         <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Account</p>
             <ul>

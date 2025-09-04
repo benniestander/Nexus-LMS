@@ -1,5 +1,5 @@
-import React from 'react';
-import { Course, Enrollment, User, Role, EngagementData } from '../types';
+import React, { useMemo } from 'react';
+import { Course, Enrollment, User, Role, EngagementData, Category } from '../types';
 import { CourseCard } from '../components/CourseCard';
 import { UsersIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, PlusCircleIcon, LayoutDashboardIcon } from '../components/Icons';
 
@@ -49,11 +49,33 @@ const StudentDashboardComponent: React.FC<{
   courses: Course[];
   enrollments: Enrollment[];
   onSelectCourse: (course: Course) => void;
-}> = ({ user, courses, enrollments, onSelectCourse }) => {
+  categories: Category[];
+  selectedCategoryId: string | null;
+}> = ({ user, courses, enrollments, onSelectCourse, categories, selectedCategoryId }) => {
   const enrolledCourseIds = enrollments.map(e => e.courseId);
-  
   const enrolledCourses = courses.filter(c => enrolledCourseIds.includes(c.id));
-  const availableCourses = courses.filter(c => !enrolledCourseIds.includes(c.id));
+
+  // Helper to find all descendant category IDs for filtering
+  const getDescendantCategoryIds = (categoryId: string, allCategories: Category[]): string[] => {
+    const children = allCategories.filter(c => c.parentId === categoryId);
+    if (children.length === 0) {
+      return [categoryId];
+    }
+    return [categoryId, ...children.flatMap(child => getDescendantCategoryIds(child.id, allCategories))];
+  };
+
+  const filteredCourses = useMemo(() => {
+    const allAvailable = courses.filter(c => !enrolledCourseIds.includes(c.id));
+    if (!selectedCategoryId) {
+      return allAvailable;
+    }
+    const categoryIdsToFilter = getDescendantCategoryIds(selectedCategoryId, categories);
+    return allAvailable.filter(course => categoryIdsToFilter.includes(course.categoryId));
+  }, [courses, enrolledCourseIds, selectedCategoryId, categories]);
+  
+  const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
+  
+  const exploreTitle = selectedCategoryId ? categoryMap.get(selectedCategoryId) || 'Explore Courses' : 'Explore Courses';
 
   const getProgress = (courseId: string) => {
     return enrollments.find(e => e.courseId === courseId)?.progress || 0;
@@ -93,6 +115,7 @@ const StudentDashboardComponent: React.FC<{
                     user={user}
                     progress={getProgress(course.id)}
                     onSelect={onSelectCourse}
+                    categoryName={categoryMap.get(course.categoryId) || 'Uncategorized'}
                 />
             ))}
             </div>
@@ -104,17 +127,24 @@ const StudentDashboardComponent: React.FC<{
       </section>
 
       <section className="mt-16">
-        <h2 className="text-2xl font-bold">Explore Courses</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-6">
-          {availableCourses.map(course => (
-            <CourseCard 
-              key={course.id} 
-              course={course}
-              user={user}
-              onSelect={onSelectCourse}
-            />
-          ))}
-        </div>
+        <h2 className="text-2xl font-bold">{exploreTitle}</h2>
+         {filteredCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-6">
+              {filteredCourses.map(course => (
+                <CourseCard 
+                  key={course.id} 
+                  course={course}
+                  user={user}
+                  onSelect={onSelectCourse}
+                  categoryName={categoryMap.get(course.categoryId) || 'Uncategorized'}
+                />
+              ))}
+            </div>
+         ) : (
+            <div className="mt-6 text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <p className="text-gray-500 dark:text-gray-400">No courses found in this category.</p>
+            </div>
+         )}
       </section>
     </div>
   );
@@ -129,7 +159,8 @@ const InstructorDashboard: React.FC<{
     enrollments: Enrollment[];
     onNavigate: (view: any) => void;
     onEditCourse: (course: Course) => void;
-}> = ({ user, courses, enrollments, onNavigate, onEditCourse }) => {
+    categories: Category[];
+}> = ({ user, courses, enrollments, onNavigate, onEditCourse, categories }) => {
     const instructorCourses = courses.filter(c => c.instructorId === user.id);
     const instructorCourseIds = instructorCourses.map(c => c.id);
     const instructorEnrollments = enrollments.filter(e => instructorCourseIds.includes(e.courseId));
@@ -138,6 +169,8 @@ const InstructorDashboard: React.FC<{
     const avgCompletion = instructorEnrollments.length > 0 
         ? instructorEnrollments.reduce((acc, e) => acc + e.progress, 0) / instructorEnrollments.length 
         : 0;
+
+    const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
 
     return (
         <div className="p-4 md:p-8">
@@ -176,7 +209,7 @@ const InstructorDashboard: React.FC<{
                                 <li key={course.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                     <div>
                                         <p className="font-semibold text-blue-600 dark:text-blue-400">{course.title}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">{course.category}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">{categoryMap.get(course.categoryId)}</p>
                                     </div>
                                     <button onClick={() => onNavigate('my-courses')} className="text-sm font-semibold text-pink-500 hover:text-pink-600">Manage</button>
                                 </li>
@@ -238,16 +271,18 @@ interface DashboardProps {
   onSelectCourse: (course: Course) => void;
   onNavigate: (view: any) => void;
   onEditCourse: (course: Course) => void;
+  categories: Category[];
+  selectedCategoryId: string | null;
 }
 
-export const StudentDashboard: React.FC<DashboardProps> = ({ user, viewAsRole, courses, enrollments, allUsers, onSelectCourse, onNavigate, onEditCourse }) => {
+export const StudentDashboard: React.FC<DashboardProps> = ({ user, viewAsRole, courses, enrollments, allUsers, onSelectCourse, onNavigate, onEditCourse, categories, selectedCategoryId }) => {
   if (viewAsRole === Role.INSTRUCTOR) {
-    return <InstructorDashboard user={user} courses={courses} enrollments={enrollments} onNavigate={onNavigate} onEditCourse={onEditCourse} />;
+    return <InstructorDashboard user={user} courses={courses} enrollments={enrollments} onNavigate={onNavigate} onEditCourse={onEditCourse} categories={categories} />;
   }
   if (viewAsRole === Role.ADMIN) {
     return <AdminDashboard user={user} courses={courses} enrollments={enrollments} allUsers={allUsers} />;
   }
   
   const userEnrollments = enrollments.filter(e => e.userId === user.id);
-  return <StudentDashboardComponent user={user} courses={courses} enrollments={userEnrollments} onSelectCourse={onSelectCourse} />;
+  return <StudentDashboardComponent user={user} courses={courses} enrollments={userEnrollments} onSelectCourse={onSelectCourse} categories={categories} selectedCategoryId={selectedCategoryId} />;
 };

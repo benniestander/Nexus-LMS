@@ -9,9 +9,10 @@ interface CourseCardProps {
   progress?: number; // Optional progress for enrolled courses
   onSelect: (course: Course) => void;
   onEdit?: (course: Course) => void;
+  categoryName: string;
 }
 
-export const CourseCard: React.FC<CourseCardProps> = ({ course, user, progress, onSelect, onEdit }) => {
+export const CourseCard: React.FC<CourseCardProps> = ({ course, user, progress, onSelect, onEdit, categoryName }) => {
   const isInstructor = user.role === Role.INSTRUCTOR && user.id === course.instructorId;
 
   const handleSelect = () => {
@@ -30,7 +31,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, user, progress, 
     >
       <div className="relative">
         <img src={course.thumbnail} alt={course.title} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
-        <div className="absolute top-3 right-3 bg-gray-900/50 text-white text-xs font-semibold px-2 py-1 rounded-full">{course.category}</div>
+        <div className="absolute top-3 right-3 bg-gray-900/50 text-white text-xs font-semibold px-2 py-1 rounded-full">{categoryName}</div>
       </div>
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="text-lg font-bold group-hover:text-pink-500 transition-colors">{course.title}</h3>

@@ -7,6 +7,7 @@ interface HeaderProps {
   viewAsRole: Role;
   onSetViewAsRole: (role: Role) => void;
   onLogout: () => void;
+  onNavigate: (view: 'profile') => void;
 }
 
 const RoleSelector: React.FC<{ user: User, viewAsRole: Role, onSetViewAsRole: (role: Role) => void }> = ({ user, viewAsRole, onSetViewAsRole }) => {
@@ -40,7 +41,7 @@ const RoleSelector: React.FC<{ user: User, viewAsRole: Role, onSetViewAsRole: (r
 };
 
 
-export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRole, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRole, onLogout, onNavigate }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
@@ -79,10 +80,10 @@ export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRol
                 <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
               </div>
               <div className="py-1">
-                <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('profile'); }} className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                     <UserCircleIcon className="w-4 h-4 mr-3" /> Profile
                 </a>
-                <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('profile'); }} className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                     <SettingsIcon className="w-4 h-4 mr-3" /> Settings
                 </a>
               </div>

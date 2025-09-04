@@ -53,7 +53,8 @@ export const getInitialData = async (user: User) => {
             messagesRes,
             calendarEventsRes,
             historyLogsRes,
-            liveSessionsRes
+            liveSessionsRes,
+            categoriesRes,
         ] = await Promise.all([
             supabase.from('courses').select('*, instructor:profiles!instructor_id(first_name, last_name)'),
             supabase.from('modules').select('*'),
@@ -65,6 +66,7 @@ export const getInitialData = async (user: User) => {
             supabase.from('calendar_events').select('*').eq('user_id', user.id),
             supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }),
             supabase.from('live_sessions').select('*'),
+            supabase.from('categories').select('*'),
         ]);
 
         if (coursesRes.error) throw coursesRes.error;
@@ -77,6 +79,7 @@ export const getInitialData = async (user: User) => {
         if (calendarEventsRes.error) throw calendarEventsRes.error;
         if (historyLogsRes.error) throw historyLogsRes.error;
         if (liveSessionsRes.error) throw liveSessionsRes.error;
+        if (categoriesRes.error) throw categoriesRes.error;
 
         // 2. Transform and assemble data
         const lessons: Lesson[] = snakeToCamel(lessonsRes.data);
@@ -114,6 +117,7 @@ export const getInitialData = async (user: User) => {
             calendarEvents: snakeToCamel(calendarEventsRes.data),
             historyLogs: snakeToCamel(historyLogsRes.data),
             liveSessions: snakeToCamel(liveSessionsRes.data),
+            categories: snakeToCamel(categoriesRes.data),
         };
 
     } catch (error) {
@@ -232,8 +236,8 @@ export const updateEnrollment = async (enrollment: Enrollment): Promise<Enrollme
 export const saveCourse = async (course: Course) => {
     try {
         // 1. Upsert course details
-        const { id, title, description, thumbnail, category, instructorId } = course;
-        const coursePayload = { id, title, description, thumbnail, category, instructor_id: instructorId };
+        const { id, title, description, thumbnail, categoryId, instructorId } = course;
+        const coursePayload = { id, title, description, thumbnail, category_id: categoryId, instructor_id: instructorId };
         const { error: courseError } = await supabase.from('courses').upsert(coursePayload);
         if (courseError) throw courseError;
         

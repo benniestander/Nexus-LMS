@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useReducer } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession } from './types';
+import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
 import { StudentDashboard } from './pages/StudentDashboard';
@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
@@ -66,6 +67,7 @@ const App: React.FC = () => {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [viewAsRole, setViewAsRole] = useState<Role | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   const loadAppData = useCallback(async (user: User) => {
       try {
@@ -74,6 +76,7 @@ const App: React.FC = () => {
             setCourses(data.courses);
             setEnrollments(data.enrollments);
             setAllUsers(data.allUsers);
+            setCategories(data.categories);
             setConversations(data.conversations);
             setMessages(data.messages);
             setCalendarEvents(data.calendarEvents);
@@ -168,6 +171,13 @@ const App: React.FC = () => {
     setCurrentView(view);
     setSelectedCourse(null);
     setEditingCourse(null);
+    setSelectedCategoryId(null);
+    closeMobileMenu();
+  };
+
+  const handleSelectCategory = (categoryId: string | null) => {
+    setSelectedCategoryId(categoryId);
+    setCurrentView('dashboard'); // Navigate to dashboard to see filtered results
     closeMobileMenu();
   };
 
@@ -204,7 +214,15 @@ const App: React.FC = () => {
     
     // Update profile table (name, role, etc.)
     if (Object.keys(profileUpdates).length > 0) {
-        await api.updateUserProfile(authState.user.id, profileUpdates);
+        const { success, error } = await api.updateUserProfile(authState.user.id, profileUpdates);
+        if (!success) {
+            console.error("Error updating profile:", error);
+            const friendlyMessage = error?.message.includes('user_role') 
+                ? "Failed to update profile due to a database configuration issue with user roles. Please contact an administrator."
+                : `Failed to update profile. Error: ${error?.message}`;
+            alert(friendlyMessage);
+            return;
+        }
     }
     
     // Update auth user (password)
@@ -320,6 +338,8 @@ const App: React.FC = () => {
                 onEditCourse={handleEditCourse}
                 onSelectCourse={handleSelectCourse}
                 onSaveUserProfile={handleSaveUserProfile}
+                categories={categories}
+                selectedCategoryId={selectedCategoryId}
             />
         );
     }
@@ -347,6 +367,8 @@ const App: React.FC = () => {
               onSelectCourse={handleSelectCourse}
               onNavigate={handleNavigate}
               onEditCourse={handleEditCourse}
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
             />
         );
     }
@@ -381,6 +403,8 @@ const App: React.FC = () => {
             onSave={handleSaveCourse}
             onExit={handleExitCourseEditor}
             onSaveUserProfile={handleSaveUserProfile}
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
         />
     )
   }
@@ -422,6 +446,9 @@ const App: React.FC = () => {
             isMobileMenuOpen={isMobileMenuOpen}
             closeMenu={closeMobileMenu}
             onLogout={handleLogout}
+            categories={categories}
+            onSelectCategory={handleSelectCategory}
+            selectedCategoryId={selectedCategoryId}
           />
            {isMobileMenuOpen && (
             <div 
@@ -436,6 +463,7 @@ const App: React.FC = () => {
                 viewAsRole={viewAsRole} 
                 onSetViewAsRole={handleSetViewAsRole} 
                 onLogout={handleLogout} 
+                onNavigate={handleNavigate}
             />
             <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 h-[calc(100vh-80px)]">
               {renderContent()}

@@ -71,12 +71,18 @@ export interface Module {
   order: number;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
 export interface Course {
   id: string;
   title: string;
   description: string;
   thumbnail: string;
-  category: string;
+  categoryId: string;
   instructorId: string;
   instructorName: string; // denormalized for convenience
   modules: Module[];
