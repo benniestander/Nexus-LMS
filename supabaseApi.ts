@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 
@@ -76,7 +77,7 @@ export const getInitialData = async (user: User) => {
             liveSessionsRes,
             categoriesRes,
         ] = await Promise.all([
-            supabase.from('courses').select('*, instructor:profiles!instructor_id(first_name, last_name)'),
+            supabase.from('courses').select('*'), // Use a simple query instead of a complex join
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
             enrollmentsPromise,
@@ -111,6 +112,9 @@ export const getInitialData = async (user: User) => {
         if (messagesRes.error) throw messagesRes.error;
 
         // 5. Transform and assemble the final data structure
+        const allUsers: User[] = snakeToCamel(usersRes.data);
+        const userMap = new Map(allUsers.map(u => [u.id, u]));
+
         const lessons: Lesson[] = snakeToCamel(lessonsRes.data);
         const modules: Module[] = snakeToCamel(modulesRes.data).map((module: any) => ({
             ...module,
@@ -121,17 +125,17 @@ export const getInitialData = async (user: User) => {
             const courseModules = modules.filter(m => m.courseId === course.id).sort((a,b) => a.order - b.order);
             const totalLessons = courseModules.reduce((acc, mod) => acc + mod.lessons.length, 0);
             const totalMinutes = courseModules.reduce((acc, mod) => acc + mod.lessons.reduce((lAcc, l) => lAcc + l.duration, 0), 0);
+            const instructor = userMap.get(course.instructorId);
             
             return {
                 ...course,
-                instructorName: course.instructor ? `${course.instructor.firstName} ${course.instructor.lastName}` : 'Unknown Instructor',
+                instructorName: instructor ? `${instructor.firstName} ${instructor.lastName}` : 'Unknown Instructor',
                 modules: courseModules,
                 totalLessons,
                 estimatedDuration: Math.round(totalMinutes / 60),
             }
         });
 
-        const allUsers: User[] = snakeToCamel(usersRes.data);
         
         return {
             courses,
