@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useReducer } from 'react';
+import React, { useState, useCallback, useEffect, useReducer, useRef } from 'react';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
@@ -132,9 +132,55 @@ const App: React.FC = () => {
   }, [loadAppData]); // Dependency ensures the callback always has the latest loadAppData function.
 
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
-  };
+  }, []);
+
+  // --- Auto-logout on inactivity ---
+  const inactivityTimer = useRef<number | null>(null);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimer.current) {
+      clearTimeout(inactivityTimer.current);
+    }
+    // Set a new timer to log the user out after 10 minutes of inactivity.
+    inactivityTimer.current = window.setTimeout(() => {
+      console.log("User inactive for 10 minutes. Logging out.");
+      handleLogout();
+    }, 10 * 60 * 1000); // 10 minutes in milliseconds
+  }, [handleLogout]);
+
+  useEffect(() => {
+    // This effect should only run when the user is authenticated.
+    if (authState.status === 'AUTHENTICATED') {
+      const activityEvents: (keyof WindowEventMap)[] = [
+        'mousemove',
+        'mousedown',
+        'keypress',
+        'scroll',
+        'touchstart',
+        'keydown',
+      ];
+
+      // Initialize the timer when the component mounts or the user authenticates.
+      resetInactivityTimer();
+
+      // Add event listeners to reset the timer on user activity.
+      activityEvents.forEach((event) => {
+        window.addEventListener(event, resetInactivityTimer, { passive: true });
+      });
+
+      // Cleanup function to remove listeners and clear the timer.
+      return () => {
+        if (inactivityTimer.current) {
+          clearTimeout(inactivityTimer.current);
+        }
+        activityEvents.forEach((event) => {
+          window.removeEventListener(event, resetInactivityTimer);
+        });
+      };
+    }
+  }, [authState.status, resetInactivityTimer]);
   
   const handleSetViewAsRole = (role: Role) => {
       setViewAsRole(role);
