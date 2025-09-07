@@ -96,8 +96,8 @@ const App: React.FC = () => {
   useEffect(() => {
     // onAuthStateChange fires an event upon initial load with the current session,
     // and for every subsequent sign-in or sign-out.
-    // FIX: Updated onAuthStateChange call to reflect Supabase v1 API.
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // FIX: Correctly destructure the subscription object from the listener.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // A session exists, so the user is signed in.
         try {
@@ -127,7 +127,6 @@ const App: React.FC = () => {
 
     // Clean up the subscription when the component unmounts.
     return () => {
-      // FIX: Added optional chaining for unsubscribe as subscription can be null.
       subscription?.unsubscribe();
     };
   }, [loadAppData]); // Dependency ensures the callback always has the latest loadAppData function.
@@ -201,13 +200,15 @@ const App: React.FC = () => {
     handleExitCourseEditor();
   };
 
-  const handleSaveUserProfile = async (updates: Partial<User> & { newPassword?: string }) => {
+  const handleSaveUserProfile = async (updates: Partial<User> & { newPassword?: string; id?: string }) => {
     if (!authState.user) return;
-    const { newPassword, ...profileUpdates } = updates;
+    const { newPassword, id, ...profileUpdates } = updates;
+
+    const targetUserId = id || authState.user.id;
     
     // Update profile table (name, role, etc.)
     if (Object.keys(profileUpdates).length > 0) {
-        const { success, error } = await api.updateUserProfile(authState.user.id, profileUpdates);
+        const { success, error } = await api.updateUserProfile(targetUserId, profileUpdates);
         if (!success) {
             console.error("Error updating profile:", error);
             const friendlyMessage = error?.message.includes('user_role') 
@@ -218,16 +219,19 @@ const App: React.FC = () => {
         }
     }
     
-    // Update auth user (password)
-    if (newPassword) {
-        // FIX: Changed `updateUser` to `update` for Supabase v1 compatibility.
-        const { error } = await supabase.auth.update({ password: newPassword });
+    // Update auth user (password) - ONLY for the currently logged-in user
+    if (newPassword && targetUserId === authState.user.id) {
+        // FIX: The method to update a user's attributes is `updateUser`.
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) {
             console.error("Error updating password:", error);
             alert("Error updating password. See console for details.");
             return;
         }
         alert("Password updated successfully!");
+    } else if (newPassword && targetUserId !== authState.user.id) {
+        console.warn("Attempted to change another user's password from the client. This is not allowed for security reasons.");
+        alert("Changing other users' passwords is not supported from this interface.");
     }
 
     await refetchData(); // Re-fetch all data to ensure UI is consistent
@@ -252,7 +256,6 @@ const App: React.FC = () => {
         // Create conversation if it doesn't exist
         const { data: newConvoData } = await supabase.from('conversations').insert({ participant_ids: [authState.user.id, recipientId] }).select().single();
         if (newConvoData) {
-            // FIX: Use the exported snakeToCamel function to convert the new conversation data.
             convo = api.snakeToCamel(newConvoData);
             setConversations(prev => [...prev, convo!]);
         }
@@ -367,11 +370,7 @@ const App: React.FC = () => {
         );
     }
 
-    // FIX: Add a guard to handle the case where the view is 'player' but there's no selected course.
-    // This satisfies TypeScript's type checker for the final return statement.
     if (currentView === 'player') {
-        // This is an inconsistent state which should ideally not be reached.
-        // Returning null prevents a crash.
         return null;
     }
 

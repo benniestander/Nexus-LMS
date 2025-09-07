@@ -15,8 +15,7 @@ export const Auth: React.FC = () => {
     setMessage(null);
     setLoading(true);
     try {
-      // FIX: Changed `signInWithPassword` to `signIn` for Supabase v1 compatibility.
-      const { error } = await supabase.auth.signIn({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       // The onAuthStateChange listener in App.tsx will handle the session update.
     } catch (error: any) {
@@ -35,8 +34,7 @@ export const Auth: React.FC = () => {
     }
     setLoading(true);
     try {
-      // FIX: Changed `resetPasswordForEmail` to `api.resetPasswordForEmail` for Supabase v1 compatibility.
-      const { error } = await supabase.auth.api.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
       if (error) throw error;

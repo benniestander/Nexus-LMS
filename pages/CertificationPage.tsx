@@ -589,17 +589,38 @@ const MyCoursesPage: React.FC<{ user: User, courses: Course[], onEditCourse: (co
     );
 };
 
-// FIX: Changed onSaveUserProfile prop to return Promise<void> to match its awaited usage.
-const UserManagementPage: React.FC<{ users: User[], onRefetchData: () => void, onSaveUserProfile: (updates: Partial<User>) => Promise<void> }> = ({ users, onRefetchData, onSaveUserProfile }) => {
+const UserManagementPage: React.FC<{ users: User[], onRefetchData: () => void, onSaveUserProfile: (updates: Partial<User> & { id?: string }) => Promise<void> }> = ({ users, onRefetchData, onSaveUserProfile }) => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [formState, setFormState] = useState<{ firstName: string; lastName: string; role: Role; } | null>(null);
 
-    const handleSave = async (updates: Partial<User>) => {
-        if (!editingUser) return;
-        await onSaveUserProfile({ id: editingUser.id, ...updates });
+    useEffect(() => {
+        if (editingUser) {
+            setFormState({
+                firstName: editingUser.firstName,
+                lastName: editingUser.lastName,
+                role: editingUser.role,
+            });
+        } else {
+            setFormState(null);
+        }
+    }, [editingUser]);
+
+    const handleSave = async () => {
+        if (!editingUser || !formState) return;
+        await onSaveUserProfile({
+            id: editingUser.id,
+            ...formState
+        });
         setEditingUser(null);
         onRefetchData();
     };
     
+    const handleFormChange = (updates: Partial<{ firstName: string; lastName: string; role: Role; }>) => {
+        if (formState) {
+            setFormState(prev => ({ ...prev!, ...updates }));
+        }
+    };
+
     return (
         <div className="p-4 md:p-8">
             <div className="flex items-center gap-4 mb-8"><UsersIcon className="w-10 h-10 text-pink-500" /><h1 className="text-4xl font-bold">User Management</h1></div>
@@ -618,19 +639,18 @@ const UserManagementPage: React.FC<{ users: User[], onRefetchData: () => void, o
                     </tbody>
                 </table>
             </div>
-            {editingUser && (
+            {editingUser && formState && (
                 <Modal isOpen={!!editingUser} onClose={() => setEditingUser(null)} title={`Edit ${editingUser.firstName}`}>
-                    {/* Simplified Edit Form */}
                     <div className="space-y-4">
-                        <div><label>First Name</label><input type="text" defaultValue={editingUser.firstName} id="edit-fname" className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600"/></div>
-                        <div><label>Last Name</label><input type="text" defaultValue={editingUser.lastName} id="edit-lname" className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600"/></div>
+                        <div><label>First Name</label><input type="text" value={formState.firstName} onChange={e => handleFormChange({ firstName: e.target.value })} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600"/></div>
+                        <div><label>Last Name</label><input type="text" value={formState.lastName} onChange={e => handleFormChange({ lastName: e.target.value })} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600"/></div>
                         <div>
                             <label>Role</label>
-                            <select defaultValue={editingUser.role} id="edit-role" className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 capitalize">
+                            <select value={formState.role} onChange={e => handleFormChange({ role: e.target.value as Role })} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 capitalize">
                                 {Object.values(Role).map(role => <option key={role} value={role} className="capitalize">{role}</option>)}
                             </select>
                         </div>
-                        <button onClick={() => handleSave({ firstName: (document.getElementById('edit-fname') as HTMLInputElement).value, lastName: (document.getElementById('edit-lname') as HTMLInputElement).value, role: (document.getElementById('edit-role') as HTMLSelectElement).value as Role })} className="bg-pink-500 text-white px-6 py-2 rounded-lg">Save</button>
+                        <button onClick={handleSave} className="bg-pink-500 text-white px-6 py-2 rounded-lg">Save</button>
                     </div>
                 </Modal>
             )}
@@ -868,8 +888,7 @@ interface ManagementPagesProps {
   courseToEdit?: Course | null;
   onSave: (course: Course) => void;
   onExit: () => void;
-  // FIX: Changed onSaveUserProfile prop to return Promise<void> to match the async function passed to it.
-  onSaveUserProfile: (updates: Partial<User> & { newPassword?: string }) => Promise<void>;
+  onSaveUserProfile: (updates: Partial<User> & { newPassword?: string; id?: string }) => Promise<void>;
   categories: Category[];
   selectedCategoryId: string | null;
 }
