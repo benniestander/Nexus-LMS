@@ -75,7 +75,7 @@ export const getInitialData = async (user: User) => {
             liveSessionsRes,
             categoriesRes,
         ] = await Promise.all([
-            supabase.from('courses').select('*, instructor:profiles!instructor_id(first_name, last_name)'),
+            supabase.from('courses').select('*, instructor:profiles(first_name, last_name)'),
             supabase.from('modules').select('*'),
             supabase.from('lessons').select('*'),
             enrollmentsPromise,

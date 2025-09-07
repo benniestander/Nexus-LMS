@@ -239,9 +239,10 @@ const InboxPage: React.FC<{
   messages: Message[];
   allUsers: User[];
   courses: Course[];
+  enrollments: Enrollment[];
   onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
   onUpdateMessages: (messages: Message[]) => void;
-}> = ({ user, conversations, messages, allUsers, courses, onSendMessage, onUpdateMessages }) => {
+}> = ({ user, conversations, messages, allUsers, courses, enrollments, onSendMessage, onUpdateMessages }) => {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [isComposing, setIsComposing] = useState(false);
 
@@ -284,10 +285,10 @@ const InboxPage: React.FC<{
 
         const instructorCourses = useMemo(() => courses.filter(c => c.instructorId === user.id), [courses, user.id]);
         const studentInstructors = useMemo(() => {
-            const enrolledCourseIds = courses.filter(c => c.modules.some(m => m.lessons.some(l => l.id))).map(c => c.id);
+            const enrolledCourseIds = enrollments.filter(e => e.userId === user.id).map(e => e.courseId);
             const instructorIds = new Set(courses.filter(c => enrolledCourseIds.includes(c.id)).map(c => c.instructorId));
             return allUsers.filter(u => instructorIds.has(u.id));
-        }, [courses, allUsers]);
+        }, [courses, allUsers, enrollments, user.id]);
 
         const canSendMessage = recipients.length > 0 && content.trim() !== '';
 
@@ -904,7 +905,7 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
     case 'user-management':
         return <UserManagementPage users={props.allUsers} onRefetchData={props.onRefetchData} onSaveUserProfile={props.onSaveUserProfile} />;
     case 'inbox':
-        return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} courses={props.courses} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} />;
+        return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} courses={props.courses} enrollments={props.enrollments} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} />;
     case 'calendar':
         return <CalendarPage events={props.calendarEvents} user={props.user} courses={props.courses} />;
     case 'history':
