@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useReducer } from 'react';
-import { Session } from '@supabase/supabase-js';
 import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
@@ -92,53 +91,47 @@ const App: React.FC = () => {
       }
   }, []);
   
-  // Effect for the initial, one-time load sequence.
+  // Effect to handle the entire authentication lifecycle.
+  // It runs once and subscribes to auth state changes from Supabase.
   useEffect(() => {
-    const checkUserAndLoadData = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+    // onAuthStateChange fires an event upon initial load with the current session,
+    // and for every subsequent sign-in or sign-out.
+    // FIX: Updated onAuthStateChange call to reflect Supabase v1 API.
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        // A session exists, so the user is signed in.
+        try {
           const userProfile = await api.getProfile(session.user.id);
           if (userProfile) {
+            // Profile found, load all necessary app data.
             await loadAppData(userProfile);
             authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
-            setViewAsRole(userProfile.role); // Set initial role for "View as"
+            setViewAsRole(userProfile.role);
           } else {
-            console.error("User is authenticated but has no profile. Signing out.");
+            // This is an edge case where a user exists in Supabase auth but not in our profiles table.
+            console.error("User authenticated but no profile found. Signing out.");
             await supabase.auth.signOut();
-            authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be loaded. Please sign in again or contact support.' } });
+            authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be found. Please contact support.' } });
           }
-        } else {
-          authDispatch({ type: 'SET_UNAUTHENTICATED' });
+        } catch (error) {
+          // This catches errors from getProfile or loadAppData.
+          console.error("Error loading application data:", error);
+          authDispatch({ type: 'SET_ERROR', payload: { error: 'There was a problem loading your data.' } });
         }
-      } catch (error) {
-        console.error("Error during initial application load:", error);
-        authDispatch({ type: 'SET_ERROR', payload: { error: 'An error occurred while starting the application.' } });
-      }
-    };
-
-    checkUserAndLoadData();
-  }, [loadAppData]); // This runs only once because loadAppData is memoized.
-
-  // Effect for handling live auth changes (e.g., logout in another tab).
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // If the user logs out from anywhere.
-      if (event === 'SIGNED_OUT') {
-        authDispatch({ type: 'LOGOUT' });
+      } else {
+        // No session found, the user is signed out.
+        authDispatch({ type: 'SET_UNAUTHENTICATED' });
         setViewAsRole(null);
-      }
-      // If a user signs in after the initial load (e.g., in another tab),
-      // and this tab doesn't have a user, reload to get a fresh state.
-      if (event === 'SIGNED_IN' && !authState.user) {
-        window.location.reload();
       }
     });
 
+    // Clean up the subscription when the component unmounts.
     return () => {
-      subscription.unsubscribe();
+      // FIX: Added optional chaining for unsubscribe as subscription can be null.
+      subscription?.unsubscribe();
     };
-  }, [authState.user]);
+  }, [loadAppData]); // Dependency ensures the callback always has the latest loadAppData function.
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -227,7 +220,8 @@ const App: React.FC = () => {
     
     // Update auth user (password)
     if (newPassword) {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        // FIX: Changed `updateUser` to `update` for Supabase v1 compatibility.
+        const { error } = await supabase.auth.update({ password: newPassword });
         if (error) {
             console.error("Error updating password:", error);
             alert("Error updating password. See console for details.");
