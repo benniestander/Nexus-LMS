@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 
@@ -112,16 +113,16 @@ export const getInitialData = async (user: User) => {
         if (messagesRes.error) throw messagesRes.error;
 
         // 5. Transform and assemble the final data structure
-        const allUsers: User[] = snakeToCamel(usersRes.data);
+        const allUsers: User[] = snakeToCamel(usersRes.data || []);
         const userMap = new Map(allUsers.map(u => [u.id, u]));
 
-        const lessons: Lesson[] = snakeToCamel(lessonsRes.data);
-        const modules: Module[] = snakeToCamel(modulesRes.data).map((module: any) => ({
+        const lessons: Lesson[] = snakeToCamel(lessonsRes.data || []);
+        const modules: Module[] = snakeToCamel(modulesRes.data || []).map((module: any) => ({
             ...module,
             lessons: lessons.filter(l => l.moduleId === module.id).sort((a,b) => a.order - b.order)
         }));
         
-        const courses: Course[] = snakeToCamel(coursesRes.data).map((course: any) => {
+        const courses: Course[] = snakeToCamel(coursesRes.data || []).map((course: any) => {
             const courseModules = modules.filter(m => m.courseId === course.id).sort((a,b) => a.order - b.order);
             const totalLessons = courseModules.reduce((acc, mod) => acc + mod.lessons.length, 0);
             const totalMinutes = courseModules.reduce((acc, mod) => acc + mod.lessons.reduce((lAcc, l) => lAcc + l.duration, 0), 0);
@@ -139,14 +140,14 @@ export const getInitialData = async (user: User) => {
         
         return {
             courses,
-            enrollments: snakeToCamel(enrollmentsRes.data),
+            enrollments: snakeToCamel(enrollmentsRes.data || []),
             allUsers,
-            conversations: snakeToCamel(conversationsRes.data),
-            messages: snakeToCamel(messagesRes.data),
-            calendarEvents: snakeToCamel(calendarEventsRes.data),
-            historyLogs: snakeToCamel(historyLogsRes.data),
-            liveSessions: snakeToCamel(liveSessionsRes.data),
-            categories: snakeToCamel(categoriesRes.data),
+            conversations: snakeToCamel(conversationsRes.data || []),
+            messages: snakeToCamel(messagesRes.data || []),
+            calendarEvents: snakeToCamel(calendarEventsRes.data || []),
+            historyLogs: snakeToCamel(historyLogsRes.data || []),
+            liveSessions: snakeToCamel(liveSessionsRes.data || []),
+            categories: snakeToCamel(categoriesRes.data || []),
         };
 
     } catch (error) {
