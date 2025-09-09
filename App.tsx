@@ -15,6 +15,7 @@ type View = SidebarView;
 interface AuthState {
   status: 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'ERROR';
   user: User | null;
+  viewAsRole: Role | null;
   error: string | null;
 }
 
@@ -22,24 +23,35 @@ type AuthAction =
   | { type: 'SET_AUTHENTICATED'; payload: { user: User } }
   | { type: 'SET_UNAUTHENTICATED' }
   | { type: 'SET_ERROR'; payload: { error: string } }
-  | { type: 'LOGOUT' };
+  | { type: 'LOGOUT' }
+  | { type: 'CHANGE_VIEW_ROLE'; payload: { role: Role } };
 
 const initialState: AuthState = {
   status: 'LOADING',
   user: null,
+  viewAsRole: null,
   error: null,
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
     case 'SET_AUTHENTICATED':
-      return { ...state, status: 'AUTHENTICATED', user: action.payload.user, error: null };
+      return { 
+          ...state, 
+          status: 'AUTHENTICATED', 
+          user: action.payload.user, 
+          viewAsRole: action.payload.user.role, // Set atomically with user
+          error: null 
+      };
     case 'SET_UNAUTHENTICATED':
-      return { ...state, status: 'UNAUTHENTICATED', user: null, error: null };
+      return { ...state, status: 'UNAUTHENTICATED', user: null, viewAsRole: null, error: null };
     case 'SET_ERROR':
-      return { ...state, status: 'ERROR', user: null, error: action.payload.error };
+      return { ...state, status: 'ERROR', user: null, viewAsRole: null, error: action.payload.error };
     case 'LOGOUT':
        return { ...initialState, status: 'UNAUTHENTICATED' };
+    case 'CHANGE_VIEW_ROLE':
+        if (state.status !== 'AUTHENTICATED') return state; // Safety check
+        return { ...state, viewAsRole: action.payload.role };
     default:
       return state;
   }
@@ -65,63 +77,67 @@ const App: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [viewAsRole, setViewAsRole] = useState<Role | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-
-  const loadAppData = useCallback(async (user: User) => {
-      try {
-        const data = await api.getInitialData(user);
-        if (data) {
-            setCourses(data.courses);
-            setEnrollments(data.enrollments);
-            setAllUsers(data.allUsers);
-            setCategories(data.categories);
-            setConversations(data.conversations);
-            setMessages(data.messages);
-            setCalendarEvents(data.calendarEvents);
-            setHistoryLogs(data.historyLogs);
-            setLiveSessions(data.liveSessions);
-        } else {
-           throw new Error("Failed to load application data.");
-        }
-      } catch (error) {
-          console.error("Failed to load app data:", error);
-          // Re-throw the error to be caught by the calling function
-          throw error;
-      }
-  }, []);
   
-  // Effect to handle the entire authentication lifecycle.
-  // It runs once and subscribes to auth state changes from Supabase.
+  // Effect to handle the entire authentication lifecycle with robust error handling and timeouts.
   useEffect(() => {
-    // onAuthStateChange fires an event upon initial load with the current session,
-    // and for every subsequent sign-in or sign-out.
-    // FIX: Correctly destructure the subscription object from the listener.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // onAuthStateChange fires on initial load and for every subsequent sign-in or sign-out.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        // A session exists, so the user is signed in.
+        // A session exists. If we are already authenticated with this user, it's likely a token
+        // refresh, so we don't need to re-fetch all application data.
+        if (authState.status === 'AUTHENTICATED' && authState.user?.id === session.user.id) {
+            return;
+        }
+
+        // This is a new sign-in. Proceed with loading all data.
         try {
-          const userProfile = await api.getProfile(session.user.id);
-          if (userProfile) {
-            // Profile found, load all necessary app data.
-            await loadAppData(userProfile);
+            const dataLoadingPromise = async () => {
+                const userProfile = await api.getProfile(session.user.id);
+                if (!userProfile) {
+                    throw new Error('Your user profile could not be found. Please contact support.');
+                }
+                
+                const appData = await api.getInitialData(userProfile);
+                if (!appData) {
+                    throw new Error('Failed to load critical application data.');
+                }
+
+                return { userProfile, appData };
+            };
+            
+            // Implement a timeout to prevent the app from getting stuck indefinitely.
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("Application timed out while loading data. Please check your network connection and try again.")), 25000)
+            );
+
+            // Race the data loading against the timeout.
+            const { userProfile, appData } = await Promise.race([dataLoadingPromise(), timeoutPromise]) as { userProfile: User, appData: Awaited<ReturnType<typeof api.getInitialData>> };
+            
+            if (appData) {
+                // All data loaded successfully, now set all states
+                setCourses(appData.courses);
+                setEnrollments(appData.enrollments);
+                setAllUsers(appData.allUsers);
+                setCategories(appData.categories);
+                setConversations(appData.conversations);
+                setMessages(appData.messages);
+                setCalendarEvents(appData.calendarEvents);
+                setHistoryLogs(appData.historyLogs);
+                setLiveSessions(appData.liveSessions);
+            }
+
+            // Finally, update the auth state atomically
             authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
-            setViewAsRole(userProfile.role);
-          } else {
-            // This is an edge case where a user exists in Supabase auth but not in our profiles table.
-            console.error("User authenticated but no profile found. Signing out.");
-            await supabase.auth.signOut();
-            authDispatch({ type: 'SET_ERROR', payload: { error: 'Your user profile could not be found. Please contact support.' } });
-          }
-        } catch (error) {
-          // This catches errors from getProfile or loadAppData.
-          console.error("Error loading application data:", error);
-          authDispatch({ type: 'SET_ERROR', payload: { error: 'There was a problem loading your data.' } });
+
+        } catch (error: any) {
+            console.error("Error during app initialization:", error);
+            await supabase.auth.signOut().catch(() => {}); // Sign out to prevent inconsistent states
+            authDispatch({ type: 'SET_ERROR', payload: { error: error.message || 'An unknown error occurred during startup.' } });
         }
       } else {
         // No session found, the user is signed out.
         authDispatch({ type: 'SET_UNAUTHENTICATED' });
-        setViewAsRole(null);
       }
     });
 
@@ -129,7 +145,7 @@ const App: React.FC = () => {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [loadAppData]); // Dependency ensures the callback always has the latest loadAppData function.
+  }, [authState.status, authState.user]); // Dependencies ensure this effect can react to programmatic logouts.
 
 
   const handleLogout = useCallback(async () => {
@@ -183,20 +199,31 @@ const App: React.FC = () => {
   }, [authState.status, resetInactivityTimer]);
   
   const handleSetViewAsRole = (role: Role) => {
-      setViewAsRole(role);
+      authDispatch({ type: 'CHANGE_VIEW_ROLE', payload: { role } });
       setCurrentView('dashboard'); // Reset to dashboard on role change
   };
 
   const refetchData = useCallback(async () => {
     if (authState.user) {
-      await loadAppData(authState.user);
+      const data = await api.getInitialData(authState.user);
+        if (data) {
+            setCourses(data.courses);
+            setEnrollments(data.enrollments);
+            setAllUsers(data.allUsers);
+            setCategories(data.categories);
+            setConversations(data.conversations);
+            setMessages(data.messages);
+            setCalendarEvents(data.calendarEvents);
+            setHistoryLogs(data.historyLogs);
+            setLiveSessions(data.liveSessions);
+        }
       // Also refetch the user profile itself in case the name/role was changed
       const userProfile = await api.getProfile(authState.user.id);
       if (userProfile) {
           authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
       }
     }
-  }, [authState.user, loadAppData]);
+  }, [authState.user]);
   
   const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -350,7 +377,7 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!authState.user || !viewAsRole) return null;
+    if (!authState.user || !authState.viewAsRole) return null;
 
     if (currentView === 'course-editor') {
         return (
@@ -399,7 +426,7 @@ const App: React.FC = () => {
         return (
              <StudentDashboard
               user={authState.user}
-              viewAsRole={viewAsRole}
+              viewAsRole={authState.viewAsRole}
               courses={courses}
               enrollments={enrollments}
               allUsers={allUsers}
@@ -462,21 +489,21 @@ const App: React.FC = () => {
               onClick={handleLogout}
               className="bg-pink-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-pink-600"
             >
-              Sign Out
+              Sign Out & Try Again
             </button>
           </div>
         </div>
       );
 
     case 'AUTHENTICATED':
-      if (!authState.user || !viewAsRole) {
+      if (!authState.user || !authState.viewAsRole) {
          return <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"><div className="bg-purple-600 text-white font-semibold px-6 py-3 rounded-lg">Loading Nexus...</div></div>;
       }
       return (
         <div className="min-h-screen flex">
           <Sidebar 
             userRole={authState.user.role} 
-            viewAsRole={viewAsRole}
+            viewAsRole={authState.viewAsRole}
             onNavigate={handleNavigate} 
             currentView={currentView} 
             isMobileMenuOpen={isMobileMenuOpen}
@@ -496,7 +523,7 @@ const App: React.FC = () => {
           <div className="flex-1 flex flex-col">
             <Header 
                 user={authState.user} 
-                viewAsRole={viewAsRole} 
+                viewAsRole={authState.viewAsRole} 
                 onSetViewAsRole={handleSetViewAsRole} 
                 onLogout={handleLogout} 
                 onNavigate={handleNavigate}
