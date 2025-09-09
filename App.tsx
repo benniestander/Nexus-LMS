@@ -60,6 +60,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
 const App: React.FC = () => {
   const [authState, authDispatch] = useReducer(authReducer, initialState);
+  const dataFetchInProgress = useRef(false);
   
   // --- Live Data States ---
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -79,18 +80,15 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   
-  // Effect to handle the entire authentication lifecycle with robust error handling and timeouts.
   useEffect(() => {
-    // onAuthStateChange fires on initial load and for every subsequent sign-in or sign-out.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        // A session exists. If we are already authenticated with this user, it's likely a token
-        // refresh, so we don't need to re-fetch all application data.
-        if (authState.status === 'AUTHENTICATED' && authState.user?.id === session.user.id) {
-            return;
-        }
+      // If a fetch is already running, ignore this event to prevent race conditions.
+      if (dataFetchInProgress.current) {
+        return;
+      }
 
-        // This is a new sign-in. Proceed with loading all data.
+      if (session?.user) {
+        dataFetchInProgress.current = true;
         try {
             const dataLoadingPromise = async () => {
                 const userProfile = await api.getProfile(session.user.id);
@@ -106,16 +104,13 @@ const App: React.FC = () => {
                 return { userProfile, appData };
             };
             
-            // Implement a timeout to prevent the app from getting stuck indefinitely.
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("Application timed out while loading data. Please check your network connection and try again.")), 25000)
             );
 
-            // Race the data loading against the timeout.
             const { userProfile, appData } = await Promise.race([dataLoadingPromise(), timeoutPromise]) as { userProfile: User, appData: Awaited<ReturnType<typeof api.getInitialData>> };
             
             if (appData) {
-                // All data loaded successfully, now set all states
                 setCourses(appData.courses);
                 setEnrollments(appData.enrollments);
                 setAllUsers(appData.allUsers);
@@ -127,29 +122,28 @@ const App: React.FC = () => {
                 setLiveSessions(appData.liveSessions);
             }
 
-            // Finally, update the auth state atomically
             authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
-
         } catch (error: any) {
             console.error("Error during app initialization:", error);
-            await supabase.auth.signOut().catch(() => {}); // Sign out to prevent inconsistent states
+            await supabase.auth.signOut().catch(() => {});
             authDispatch({ type: 'SET_ERROR', payload: { error: error.message || 'An unknown error occurred during startup.' } });
+        } finally {
+            dataFetchInProgress.current = false;
         }
       } else {
-        // No session found, the user is signed out.
         authDispatch({ type: 'SET_UNAUTHENTICATED' });
       }
     });
 
-    // Clean up the subscription when the component unmounts.
     return () => {
       subscription?.unsubscribe();
     };
-  }, [authState.status, authState.user]); // Dependencies ensure this effect can react to programmatic logouts.
+  }, []); // Empty dependency array ensures this effect runs only once on mount.
 
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
+    authDispatch({ type: 'LOGOUT' });
   }, []);
 
   // --- Auto-logout on inactivity ---
