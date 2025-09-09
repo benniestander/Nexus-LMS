@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
 
@@ -152,7 +149,7 @@ export const getInitialData = async (user: User) => {
 
     } catch (error) {
         console.error("Error fetching initial dashboard data:", error);
-        return null;
+        throw error;
     }
 };
 
