@@ -504,7 +504,7 @@ const App: React.FC = () => {
                 onLogout={handleLogout} 
                 onNavigate={handleNavigate}
             />
-            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 h-[calc(100vh-80px)]">
+            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 h-[calc(100vh-96px)]">
               {renderContent()}
             </main>
           </div>

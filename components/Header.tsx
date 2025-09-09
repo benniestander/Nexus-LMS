@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRol
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 h-20 flex items-center justify-between z-30 sticky top-0">
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 h-24 flex items-center justify-between z-30 sticky top-0">
       <div className="flex items-center gap-8">
         <RoleSelector user={user} viewAsRole={viewAsRole} onSetViewAsRole={onSetViewAsRole} />
       </div>
