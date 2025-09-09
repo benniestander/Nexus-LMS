@@ -246,9 +246,9 @@ const App: React.FC = () => {
     handleExitCourseEditor();
   };
 
-  const handleSaveUserProfile = async (updates: Partial<User> & { newPassword?: string; id?: string }) => {
+  const handleSaveUserProfile = async (updates: Partial<User> & { id?: string }) => {
     if (!authState.user) return;
-    const { newPassword, id, ...profileUpdates } = updates;
+    const { id, ...profileUpdates } = updates;
 
     const targetUserId = id || authState.user.id;
     
@@ -256,31 +256,26 @@ const App: React.FC = () => {
     if (Object.keys(profileUpdates).length > 0) {
         const { success, error } = await api.updateUserProfile(targetUserId, profileUpdates);
         if (!success) {
-            console.error("Error updating profile:", error);
             const friendlyMessage = error?.message.includes('user_role') 
                 ? "Failed to update profile due to a database configuration issue with user roles. Please contact an administrator."
                 : `Failed to update profile. Error: ${error?.message}`;
             alert(friendlyMessage);
-            return;
+            throw new Error(friendlyMessage); // Throw to allow UI to handle loading state
         }
-    }
-    
-    // Update auth user (password) - ONLY for the currently logged-in user
-    if (newPassword && targetUserId === authState.user.id) {
-        // FIX: The method to update a user's attributes is `updateUser`.
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) {
-            console.error("Error updating password:", error);
-            alert("Error updating password. See console for details.");
-            return;
-        }
-        alert("Password updated successfully!");
-    } else if (newPassword && targetUserId !== authState.user.id) {
-        console.warn("Attempted to change another user's password from the client. This is not allowed for security reasons.");
-        alert("Changing other users' passwords is not supported from this interface.");
     }
 
     await refetchData(); // Re-fetch all data to ensure UI is consistent
+  };
+
+  const handleUpdatePassword = async (newPassword: string) => {
+    if (!authState.user) return;
+    
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+        console.error("Error updating password:", error);
+        alert(`Error updating password: ${error.message}`);
+        throw error;
+    }
   };
 
   const handleExitPlayer = () => {
@@ -381,6 +376,7 @@ const App: React.FC = () => {
                 onEditCourse={handleEditCourse}
                 onSelectCourse={handleSelectCourse}
                 onSaveUserProfile={handleSaveUserProfile}
+                onUpdatePassword={handleUpdatePassword}
                 categories={categories}
                 selectedCategoryId={selectedCategoryId}
             />
@@ -442,6 +438,7 @@ const App: React.FC = () => {
             onSave={handleSaveCourse}
             onExit={handleExitCourseEditor}
             onSaveUserProfile={handleSaveUserProfile}
+            onUpdatePassword={handleUpdatePassword}
             categories={categories}
             selectedCategoryId={selectedCategoryId}
         />

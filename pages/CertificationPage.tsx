@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, HistoryLog, HistoryAction, LiveSession, VideoProvider, VideoData, Category } from '../types';
 import { AwardIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, ChevronDownIcon, ChevronUpIcon, EditIcon, FileTextIcon, GripVerticalIcon, PlusCircleIcon, SettingsIcon, Trash2Icon, UsersIcon, PlayCircleIcon, ClipboardListIcon, XIcon, SearchIcon, DownloadIcon, MailIcon, SendIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, MessageSquareIcon, VideoIcon, UserCircleIcon, BoldIcon, ItalicIcon, UnderlineIcon, ListIcon, ListOrderedIcon, ClockIcon } from '../components/Icons';
@@ -503,33 +501,61 @@ const HistoryPage: React.FC<{ logs: HistoryLog[] }> = ({ logs }) => {
     );
 };
 
-const ProfilePage: React.FC<{ user: User; onSave: (updates: Partial<User> & { newPassword?: string }) => Promise<void> }> = ({ user, onSave }) => {
+const ProfilePage: React.FC<{
+    user: User;
+    onSaveProfile: (updates: Partial<User>) => Promise<void>;
+    onUpdatePassword: (newPassword: string) => Promise<void>;
+}> = ({ user, onSaveProfile, onUpdatePassword }) => {
     const [firstName, setFirstName] = useState(user.firstName);
     const [lastName, setLastName] = useState(user.lastName);
     const [company, setCompany] = useState(user.company || '');
     const [bio, setBio] = useState(user.bio || '');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleProfileSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSavingProfile(true);
+        try {
+            await onSaveProfile({
+                firstName,
+                lastName,
+                company,
+                bio,
+            });
+             alert('Profile updated successfully!');
+        } catch (error) {
+            // Errors are alerted in App.tsx, this is just to stop the loading state
+            console.error("Failed to save profile", error);
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+    
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newPassword && newPassword !== confirmPassword) {
             alert("Passwords do not match.");
             return;
         }
-        setIsSaving(true);
-        const updates: Partial<User> & { newPassword?: string } = {
-            firstName,
-            lastName,
-            company,
-            bio,
-        };
-        if (newPassword) {
-            updates.newPassword = newPassword;
+        if (!newPassword) {
+            alert("Please provide a new password.");
+            return;
         }
-        await onSave(updates);
-        setIsSaving(false);
+        setIsSavingPassword(true);
+        try {
+            await onUpdatePassword(newPassword);
+            alert('Password updated successfully!');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (error) {
+            // Errors are alerted in App.tsx
+            console.error("Failed to update password", error);
+        } finally {
+            setIsSavingPassword(false);
+        }
     };
     
     return (
@@ -538,8 +564,8 @@ const ProfilePage: React.FC<{ user: User; onSave: (updates: Partial<User> & { ne
                 <UserCircleIcon className="w-10 h-10 text-pink-500" />
                 <h1 className="text-4xl font-bold">My Profile</h1>
             </div>
-             <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto">
-                 <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-md">
+             <div className="space-y-8 max-w-4xl mx-auto">
+                 <form onSubmit={handleProfileSubmit} className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-md">
                      <h2 className="text-2xl font-bold mb-6">Personal Information</h2>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div><label className="font-semibold">First Name</label><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
@@ -548,20 +574,25 @@ const ProfilePage: React.FC<{ user: User; onSave: (updates: Partial<User> & { ne
                         <div><label className="font-semibold">Company</label><input type="text" value={company} onChange={e => setCompany(e.target.value)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
                         <div className="md:col-span-2"><label className="font-semibold">Bio</label><textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"></textarea></div>
                      </div>
-                 </div>
-                 <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-md">
+                      <div className="text-right mt-6">
+                         <button type="submit" disabled={isSavingProfile} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 disabled:bg-pink-400 disabled:cursor-not-allowed transition-colors">
+                            {isSavingProfile ? 'Saving...' : 'Save Profile'}
+                         </button>
+                     </div>
+                 </form>
+                 <form onSubmit={handlePasswordSubmit} className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-md">
                     <h2 className="text-2xl font-bold mb-6">Change Password</h2>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div><label className="font-semibold">New Password</label><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
                         <div><label className="font-semibold">Confirm New Password</label><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
                      </div>
-                </div>
-                 <div className="text-right">
-                     <button type="submit" disabled={isSaving} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-pink-600 disabled:bg-pink-400 disabled:cursor-not-allowed transition-colors">
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                     </button>
-                 </div>
-             </form>
+                     <div className="text-right mt-6">
+                         <button type="submit" disabled={isSavingPassword} className="bg-blue-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors">
+                            {isSavingPassword ? 'Updating...' : 'Update Password'}
+                         </button>
+                     </div>
+                </form>
+             </div>
          </div>
     );
 };
@@ -889,7 +920,8 @@ interface ManagementPagesProps {
   courseToEdit?: Course | null;
   onSave: (course: Course) => void;
   onExit: () => void;
-  onSaveUserProfile: (updates: Partial<User> & { newPassword?: string; id?: string }) => Promise<void>;
+  onSaveUserProfile: (updates: Partial<User> & { id?: string }) => Promise<void>;
+  onUpdatePassword: (newPassword: string) => Promise<void>;
   categories: Category[];
   selectedCategoryId: string | null;
 }
@@ -911,7 +943,7 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
     case 'history':
         return <HistoryPage logs={props.historyLogs} />;
     case 'profile':
-        return <ProfilePage user={props.user} onSave={props.onSaveUserProfile} />;
+        return <ProfilePage user={props.user} onSaveProfile={props.onSaveUserProfile} onUpdatePassword={props.onUpdatePassword} />;
     case 'analytics':
         return <AnalyticsPage />;
     case 'student-management':
