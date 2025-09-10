@@ -158,7 +158,7 @@ const InstructorDashboard: React.FC<{
     courses: Course[];
     enrollments: Enrollment[];
     onNavigate: (view: any) => void;
-    onEditCourse: (course: Course) => void;
+    onEditCourse: (course: Course | null) => void;
     categories: Category[];
 }> = ({ user, courses, enrollments, onNavigate, onEditCourse, categories }) => {
     const instructorCourses = courses.filter(c => c.instructorId === user.id);
@@ -196,7 +196,7 @@ const InstructorDashboard: React.FC<{
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-bold">Your Courses</h3>
                         <button 
-                            onClick={() => onEditCourse({} as Course)} 
+                            onClick={() => onEditCourse(null)} 
                             className="flex items-center gap-2 text-sm font-semibold text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300 bg-pink-100/50 dark:bg-pink-900/30 hover:bg-pink-100 dark:hover:bg-pink-900/50 px-3 py-1.5 rounded-lg transition-all"
                         >
                             <PlusCircleIcon className="w-5 h-5" />
@@ -270,7 +270,7 @@ interface DashboardProps {
   allUsers: User[];
   onSelectCourse: (course: Course) => void;
   onNavigate: (view: any) => void;
-  onEditCourse: (course: Course) => void;
+  onEditCourse: (course: Course | null) => void;
   categories: Category[];
   selectedCategoryId: string | null;
 }

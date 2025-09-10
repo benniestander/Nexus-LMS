@@ -105,7 +105,7 @@ const App: React.FC = () => {
             };
             
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Application timed out while loading data. Please check your network connection and try again.")), 25000)
+                setTimeout(() => reject(new Error("Application timed out while loading data. Please check your network connection and try again.")), 60000)
             );
 
             const { userProfile, appData } = await Promise.race([dataLoadingPromise(), timeoutPromise]) as { userProfile: User, appData: Awaited<ReturnType<typeof api.getInitialData>> };
@@ -247,7 +247,25 @@ const App: React.FC = () => {
   };
   
   const handleEditCourse = (course: Course | null) => {
-      setEditingCourse(course);
+      if (course) {
+        setEditingCourse(course);
+      } else {
+        // Create a new, blank course object for the editor
+        if (authState.user) {
+            setEditingCourse({
+                id: `new-course-${Date.now()}`,
+                title: '',
+                description: '',
+                thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', // default placeholder
+                categoryId: categories[0]?.id || '',
+                instructorId: authState.user.id,
+                instructorName: `${authState.user.firstName} ${authState.user.lastName}`,
+                modules: [],
+                totalLessons: 0,
+                estimatedDuration: 0,
+            });
+        }
+      }
       setCurrentView('course-editor');
       closeMobileMenu();
   };
