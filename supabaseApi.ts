@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
+import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category, QuizAttempt } from './types';
 
 // ====================================================================================
 // ===== DATA TRANSFORMATION UTILS
@@ -260,6 +260,24 @@ export const updateEnrollment = async (enrollment: Enrollment): Promise<Enrollme
     return snakeToCamel(data);
 };
 
+export const saveQuizAttempt = async (attempt: Omit<QuizAttempt, 'id' | 'submittedAt'>) => {
+    const payload = {
+        user_id: attempt.userId,
+        course_id: attempt.courseId,
+        lesson_id: attempt.lessonId,
+        score: attempt.score,
+        passed: attempt.passed,
+        answers: attempt.answers,
+    };
+    const { data, error } = await supabase.from('quiz_attempts').insert(payload).select().single();
+
+    if (error) {
+        console.error("Error saving quiz attempt:", error);
+        return { success: false, error };
+    }
+    return { success: true, data: snakeToCamel(data) };
+};
+
 export const saveCourse = async (course: Course) => {
     try {
         const isNewCourse = course.id.startsWith('new-course-');
@@ -327,7 +345,16 @@ export const saveCourse = async (course: Course) => {
             for (const [index, lesson] of module.lessons.entries()) {
                 const isNewLesson = lesson.id.startsWith('new-lesson-');
                 const { id, moduleId, ...lessonData } = lesson;
-                const payload = { ...lessonData, module_id: module.id, order: index };
+                // FIX: Explicitly construct payload to ensure correct column names (snake_case vs camelCase).
+                // The spread operator was sending camelCase keys which the database does not have.
+                const payload = {
+                    title: lessonData.title,
+                    type: lessonData.type,
+                    content: lessonData.content,
+                    duration: lessonData.duration,
+                    order: index,
+                    module_id: module.id
+                };
 
                 let savedLessonId = id;
                 if (isNewLesson) {

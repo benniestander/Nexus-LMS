@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useReducer, useRef } from 'react';
-import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category } from './types';
+import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category, QuizAttempt } from './types';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
 import { StudentDashboard } from './pages/StudentDashboard';
@@ -326,6 +326,11 @@ const App: React.FC = () => {
     await api.updateEnrollment(updatedEnrollment);
   }
 
+  const handleSaveQuizAttempt = async (attempt: Omit<QuizAttempt, 'id' | 'submittedAt'>) => {
+    await api.saveQuizAttempt(attempt);
+    // Optionally, could add a history log here or refetch analytics data.
+  };
+
   const handleSendMessage = async (recipientIds: string[], subject: string, content: string) => {
     if(!authState.user) return;
     // Simplified: assumes 1-on-1, finds or creates convo
@@ -472,6 +477,7 @@ const App: React.FC = () => {
               enrollment={getEnrollmentForCourse(selectedCourse.id)}
               onExit={handleExitPlayer}
               onEnrollmentUpdate={handleEnrollmentUpdate}
+              onSaveQuizAttempt={handleSaveQuizAttempt}
             />
         );
     }

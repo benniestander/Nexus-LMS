@@ -1,7 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User } from '../types';
+import { Course, Enrollment, Lesson, LessonType, QuizData, Question, User, QuizAttempt } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
 import { PlayCircleIcon, CheckCircle2Icon, CircleIcon, ChevronLeftIcon, LockIcon, ClipboardListIcon, StarIcon, BookOpenIcon, FileTextIcon, ChevronRightIcon, ClockIcon, XIcon, AwardIcon } from '../components/Icons';
 
@@ -102,9 +102,10 @@ interface CoursePlayerProps {
   enrollment: Enrollment;
   onExit: () => void;
   onEnrollmentUpdate: (enrollment: Enrollment) => void;
+  onSaveQuizAttempt: (attempt: Omit<QuizAttempt, 'id' | 'submittedAt'>) => void;
 }
 
-const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, onExit, onEnrollmentUpdate }) => {
+const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, onExit, onEnrollmentUpdate, onSaveQuizAttempt }) => {
   const allLessons = useMemo(() => course.modules.flatMap(m => m.lessons), [course]);
 
   const findInitialLesson = () => allLessons.find(l => l.id === enrollment.lastAccessedLessonId) || allLessons[0] || null;
@@ -201,6 +202,16 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
         progress: newProgress
     };
     onEnrollmentUpdate(newEnrollment);
+
+    // NEW: Save the quiz attempt details
+    onSaveQuizAttempt({
+        userId: user.id,
+        courseId: course.id,
+        lessonId: currentLesson.id,
+        score,
+        passed,
+        answers,
+    });
 
     setLastQuizResult({ score, passed, passingScore: quizData.passingScore });
     setPlayerView('quiz_result');
