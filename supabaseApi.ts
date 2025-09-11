@@ -28,13 +28,13 @@ export const snakeToCamel = (obj: any): any => {
 
 export const getProfile = async (userId: string): Promise<User | null> => {
     const { data, error } = await supabase
-        .from('users_view')
+        .from('profiles')
         .select(`*`)
         .eq('id', userId)
         .single();
     
     if (error) {
-        console.error("Error fetching profile:", error);
+        console.error("Error fetching profile:", error.message);
         return null;
     }
     return snakeToCamel(data);
@@ -60,7 +60,7 @@ export const getInitialData = async (user: User) => {
             : supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false });
 
         // For non-admins, RLS policies should restrict which users they can see.
-        const usersPromise = supabase.from('users_view').select('*');
+        const usersPromise = supabase.from('profiles').select('*');
 
         // 2. Fetch base data in parallel
         const [
@@ -295,6 +295,8 @@ export const saveCourse = async (course: Course) => {
                 instructor_id: courseData.instructorId,
                 has_quizzes: courseData.hasQuizzes,
                 certification_pass_rate: courseData.certificationPassRate,
+                final_exam: courseData.finalExam,
+                is_certification_course: courseData.isCertificationCourse,
             };
             const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
             if (error) throw new Error(`Failed to create course: ${error.message}`);
@@ -309,6 +311,8 @@ export const saveCourse = async (course: Course) => {
                 instructor_id: courseData.instructorId,
                 has_quizzes: courseData.hasQuizzes,
                 certification_pass_rate: courseData.certificationPassRate,
+                final_exam: courseData.finalExam,
+                is_certification_course: courseData.isCertificationCourse,
             };
             const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
             if (error) throw new Error(`Failed to update course: ${error.message}`);

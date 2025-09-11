@@ -104,7 +104,22 @@ const CertificationsPage: React.FC<{ user: User; courses: Course[]; enrollments:
 
     const completedCourses = useMemo(() => {
         return enrollments
-            .filter(e => e.userId === user.id && e.progress === 100)
+            .filter(e => {
+                if (e.userId !== user.id || e.progress < 100) return false;
+                const course = courses.find(c => c.id === e.courseId);
+                if (!course) return false;
+                
+                // If the course is explicitly non-certifiable, it shouldn't appear here.
+                if (course.isCertificationCourse === false) return false;
+
+                // If a course has a final exam, the student must have passed it.
+                if (course.finalExam) {
+                    const finalExamScore = e.quizScores[`course-${course.id}`];
+                    return finalExamScore?.passed === true;
+                }
+                // If no final exam, 100% progress is enough.
+                return true;
+            })
             .map(e => courses.find(c => c.id === e.courseId))
             .filter((c): c is Course => c !== undefined);
     }, [user.id, courses, enrollments]);
@@ -159,7 +174,7 @@ const CertificationsPage: React.FC<{ user: User; courses: Course[]; enrollments:
                 <div className="text-center py-16 bg-gray-100 dark:bg-gray-800 rounded-lg w-full max-w-2xl">
                     <AwardIcon className="w-16 h-16 mx-auto text-gray-400" />
                     <h2 className="mt-4 text-2xl font-semibold">No Certificates Yet</h2>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Complete a course to 100% to earn your certificate!</p>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Complete a course and pass the final exam (if any) to earn your certificate.</p>
                 </div>
             </div>
         );
@@ -850,6 +865,104 @@ const CategoriesPage: React.FC<{
 // ===== COURSE EDITOR - A very large and complex component
 // ====================================================================================
 
+const QuizEditorModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    quizData: QuizData | undefined;
+    onSave: (quizData: QuizData) => void;
+    title: string;
+}> = ({ isOpen, onClose, quizData: initialQuizData, onSave, title }) => {
+    const [quizData, setQuizData] = useState<QuizData>({ questions: [], passingScore: 80 });
+
+    useEffect(() => {
+        setQuizData(JSON.parse(JSON.stringify(initialQuizData || { questions: [], passingScore: 80 })));
+    }, [initialQuizData, isOpen]);
+
+    const updateQuizField = (field: keyof QuizData, value: any) => {
+        setQuizData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const addQuestion = () => {
+        const newQuestion: Question = { id: `new-q-${Date.now()}`, questionText: '', options: ['', ''], correctAnswerIndex: 0 };
+        updateQuizField('questions', [...quizData.questions, newQuestion]);
+    };
+    const updateQuestion = (qIndex: number, text: string) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].questionText = text;
+        updateQuizField('questions', newQuestions);
+    };
+    const deleteQuestion = (qIndex: number) => {
+        const newQuestions = quizData.questions.filter((_, idx) => idx !== qIndex);
+        updateQuizField('questions', newQuestions);
+    };
+    const addOption = (qIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options.push('');
+        updateQuizField('questions', newQuestions);
+    };
+    const updateOption = (qIndex: number, oIndex: number, text: string) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options[oIndex] = text;
+        updateQuizField('questions', newQuestions);
+    };
+    const deleteOption = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].options.splice(oIndex, 1);
+        if (newQuestions[qIndex].correctAnswerIndex >= oIndex) {
+            newQuestions[qIndex].correctAnswerIndex = Math.max(0, newQuestions[qIndex].correctAnswerIndex - 1);
+        }
+        updateQuizField('questions', newQuestions);
+    };
+    const setCorrectAnswer = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...quizData.questions];
+        newQuestions[qIndex].correctAnswerIndex = oIndex;
+        updateQuizField('questions', newQuestions);
+    }
+
+    if (!isOpen) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={title}
+            footer={
+                <div className="flex justify-end gap-4">
+                    <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 px-6 py-2 rounded-lg font-semibold">Cancel</button>
+                    <button onClick={() => onSave(quizData)} className="bg-pink-500 text-white px-6 py-2 rounded-lg font-semibold">Save Quiz</button>
+                </div>
+            }>
+            <div className="space-y-6">
+                <div>
+                    <label className="font-semibold">Passing Score (%)</label>
+                    <input type="number" min="0" max="100" value={quizData.passingScore} onChange={e => updateQuizField('passingScore', parseInt(e.target.value, 10))} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                </div>
+                <div className="space-y-4">
+                    {quizData.questions.map((q, qIndex) => (
+                        <div key={q.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex justify-between items-center">
+                                <label className="font-semibold text-gray-700 dark:text-gray-300">Question {qIndex + 1}</label>
+                                <button onClick={() => deleteQuestion(qIndex)} className="p-1 text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5" /></button>
+                            </div>
+                            <textarea value={q.questionText} onChange={e => updateQuestion(qIndex, e.target.value)} placeholder="Type your question here" className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" rows={2}></textarea>
+                            <div className="space-y-2">
+                                {q.options.map((opt, oIndex) => (
+                                    <div key={oIndex} className="flex items-center gap-2">
+                                        <input type="radio" name={`correct-answer-${q.id}`} checked={q.correctAnswerIndex === oIndex} onChange={() => setCorrectAnswer(qIndex, oIndex)} className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 dark:border-gray-500 bg-transparent" />
+                                        <input type="text" value={opt} onChange={e => updateOption(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-grow p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                        <button onClick={() => deleteOption(qIndex, oIndex)} disabled={q.options.length <= 2} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><XIcon className="w-5 h-5" /></button>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => addOption(qIndex)} className="text-sm text-pink-500 font-semibold flex items-center gap-1"><PlusCircleIcon className="w-4 h-4" /> Add Option</button>
+                        </div>
+                    ))}
+                </div>
+                <button onClick={addQuestion} className="w-full bg-pink-100/50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold py-2 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/50 flex items-center justify-center gap-2">
+                    <PlusCircleIcon className="w-5 h-5" /> Add Question
+                </button>
+            </div>
+        </Modal>
+    );
+};
+
 const LessonEditModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -886,60 +999,6 @@ const LessonEditModal: React.FC<{
         if (!lesson) return;
         setLesson({ ...lesson, content: { ...lesson.content, [field]: value } });
     };
-    
-    const updateQuizData = (field: keyof QuizData, value: any) => {
-        if (!lesson?.content.quizData) return;
-        const newQuizData = { ...lesson.content.quizData, [field]: value };
-        updateContentField('quizData', newQuizData);
-    };
-
-    // --- Quiz Question Handlers ---
-    const addQuestion = () => {
-        const newQuestion: Question = { id: `new-q-${Date.now()}`, questionText: '', options: ['', ''], correctAnswerIndex: 0 };
-        updateQuizData('questions', [...(lesson?.content.quizData?.questions || []), newQuestion]);
-    };
-
-    const updateQuestion = (qIndex: number, text: string) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions[qIndex].questionText = text;
-        updateQuizData('questions', newQuestions);
-    };
-
-    const deleteQuestion = (qIndex: number) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions.splice(qIndex, 1);
-        updateQuizData('questions', newQuestions);
-    };
-
-    const addOption = (qIndex: number) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions[qIndex].options.push('');
-        updateQuizData('questions', newQuestions);
-    };
-    
-    const updateOption = (qIndex: number, oIndex: number, text: string) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions[qIndex].options[oIndex] = text;
-        updateQuizData('questions', newQuestions);
-    };
-
-    const deleteOption = (qIndex: number, oIndex: number) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions[qIndex].options.splice(oIndex, 1);
-        // Adjust correct answer index if it's affected
-        if (newQuestions[qIndex].correctAnswerIndex === oIndex) {
-             newQuestions[qIndex].correctAnswerIndex = 0;
-        } else if (newQuestions[qIndex].correctAnswerIndex > oIndex) {
-             newQuestions[qIndex].correctAnswerIndex -= 1;
-        }
-        updateQuizData('questions', newQuestions);
-    };
-
-    const setCorrectAnswer = (qIndex: number, oIndex: number) => {
-        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
-        newQuestions[qIndex].correctAnswerIndex = oIndex;
-        updateQuizData('questions', newQuestions);
-    }
 
     const handleSave = () => {
         if (lesson) onSave(lesson);
@@ -983,37 +1042,13 @@ const LessonEditModal: React.FC<{
                 )}
                 
                 {lesson.type === LessonType.QUIZ && (
-                    <div className="space-y-6 border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Quiz Editor</h3>
-                        <div>
-                            <label className="font-semibold">Passing Score (%)</label>
-                            <input type="number" min="0" max="100" value={lesson.content.quizData?.passingScore || 80} onChange={e => updateQuizData('passingScore', parseInt(e.target.value, 10))} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                        </div>
-                        <div className="space-y-4">
-                            {lesson.content.quizData?.questions.map((q, qIndex) => (
-                                <div key={q.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800/50">
-                                    <div className="flex justify-between items-center">
-                                        <label className="font-semibold text-gray-700 dark:text-gray-300">Question {qIndex + 1}</label>
-                                        <button onClick={() => deleteQuestion(qIndex)} className="p-1 text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5"/></button>
-                                    </div>
-                                    <textarea value={q.questionText} onChange={e => updateQuestion(qIndex, e.target.value)} placeholder="Type your question here" className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" rows={2}></textarea>
-                                    <div className="space-y-2">
-                                        {q.options.map((opt, oIndex) => (
-                                            <div key={oIndex} className="flex items-center gap-2">
-                                                <input type="radio" name={`correct-answer-${q.id}`} checked={q.correctAnswerIndex === oIndex} onChange={() => setCorrectAnswer(qIndex, oIndex)} className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 dark:border-gray-500 bg-transparent" />
-                                                <input type="text" value={opt} onChange={e => updateOption(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-grow p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                                                <button onClick={() => deleteOption(qIndex, oIndex)} disabled={q.options.length <= 2} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><XIcon className="w-5 h-5"/></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => addOption(qIndex)} className="text-sm text-pink-500 font-semibold flex items-center gap-1"><PlusCircleIcon className="w-4 h-4" /> Add Option</button>
-                                </div>
-                            ))}
-                        </div>
-                        <button onClick={addQuestion} className="w-full bg-pink-100/50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold py-2 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/50 flex items-center justify-center gap-2">
-                           <PlusCircleIcon className="w-5 h-5"/> Add Question
-                        </button>
-                    </div>
+                   <QuizEditorModal 
+                        isOpen={true} 
+                        onClose={()=>{}} 
+                        quizData={lesson.content.quizData} 
+                        onSave={(newQuizData) => updateContentField('quizData', newQuizData)} 
+                        title="Lesson Quiz Editor"
+                    />
                 )}
             </div>
         </Modal>
@@ -1033,6 +1068,7 @@ const CourseEditor: React.FC<{
         id: `new-course-${Date.now()}`, title: '', description: '', thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', categoryId: categories[0]?.id || '', instructorId: user.id, instructorName: `${user.firstName} ${user.lastName}`, modules: [], totalLessons: 0, estimatedDuration: 0,
     });
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+    const [editingQuiz, setEditingQuiz] = useState<{ type: 'module' | 'final'; id: string; data: QuizData | undefined } | null>(null);
     const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
     const [newInlineCategoryName, setNewInlineCategoryName] = useState('');
     const [newInlineCategoryParentId, setNewInlineCategoryParentId] = useState<string | null>(null);
@@ -1047,8 +1083,8 @@ const CourseEditor: React.FC<{
         updateCourseField('modules', [...course.modules, newModule]);
     };
     
-    const updateModule = (moduleId: string, newTitle: string) => {
-        updateCourseField('modules', course.modules.map(m => m.id === moduleId ? {...m, title: newTitle} : m));
+    const updateModule = (moduleId: string, updates: Partial<Module>) => {
+        updateCourseField('modules', course.modules.map(m => m.id === moduleId ? {...m, ...updates} : m));
     };
 
     const deleteModule = (moduleId: string) => {
@@ -1089,6 +1125,16 @@ const CourseEditor: React.FC<{
             updateCourseField('modules', newModules);
         }
         setEditingLesson(null);
+    };
+
+    const saveQuiz = (quizData: QuizData) => {
+        if (!editingQuiz) return;
+        if (editingQuiz.type === 'final') {
+            updateCourseField('finalExam', quizData);
+        } else if (editingQuiz.type === 'module') {
+            updateModule(editingQuiz.id, { quiz: quizData });
+        }
+        setEditingQuiz(null);
     };
     
     const handleAddInlineCategory = async () => {
@@ -1171,33 +1217,15 @@ const CourseEditor: React.FC<{
                     <div><label className="font-semibold">Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
                     <img src={course.thumbnail} alt="Thumbnail preview" className="w-full rounded-lg object-cover aspect-video mt-2" />
                     
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
-                        <h3 className="text-lg font-bold">Quiz Settings</h3>
-                        <div>
-                            <label className="flex items-center gap-3 font-semibold cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={!!course.hasQuizzes} 
-                                    onChange={e => updateCourseField('hasQuizzes', e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-pink-600 focus:ring-pink-500 bg-transparent"
-                                />
-                                Will this course have quizzes?
-                            </label>
+                    {course.isCertificationCourse !== false && (
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+                            <h3 className="text-lg font-bold">Final Exam</h3>
+                            <p className="text-sm text-gray-500">Add a final exam required for certification. This will be presented to students after completing all modules.</p>
+                            <button onClick={() => setEditingQuiz({ type: 'final', id: course.id, data: course.finalExam })} className="w-full flex items-center justify-center gap-2 bg-blue-100/50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
+                                 <EditIcon className="w-4 h-4" /> {course.finalExam && course.finalExam.questions.length > 0 ? 'Edit Final Exam' : 'Add Final Exam'}
+                            </button>
                         </div>
-                        {course.hasQuizzes && (
-                            <div>
-                                <label className="font-semibold">Certification Pass Rate (%)</label>
-                                <input 
-                                    type="number" 
-                                    value={course.certificationPassRate || 80} 
-                                    onChange={e => updateCourseField('certificationPassRate', parseInt(e.target.value, 10))} 
-                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"
-                                    min="0"
-                                    max="100"
-                                />
-                            </div>
-                        )}
-                    </div>
+                    )}
 
                 </div>
 
@@ -1210,7 +1238,7 @@ const CourseEditor: React.FC<{
                     {course.modules.map(module => (
                         <div key={module.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
                             <div className="flex items-center justify-between">
-                                <input type="text" value={module.title} onChange={e => updateModule(module.id, e.target.value)} className="font-bold text-lg bg-transparent border-none focus:ring-0 w-full" />
+                                <input type="text" value={module.title} onChange={e => updateModule(module.id, { title: e.target.value })} className="font-bold text-lg bg-transparent border-none focus:ring-0 w-full" />
                                 <button onClick={() => deleteModule(module.id)} className="text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5"/></button>
                             </div>
                              <ul className="mt-4 space-y-2">
@@ -1228,12 +1256,24 @@ const CourseEditor: React.FC<{
                                     </li>
                                 ))}
                             </ul>
-                            <button onClick={() => addLesson(module.id)} className="mt-4 text-sm text-pink-500 font-semibold flex items-center gap-2"><PlusCircleIcon className="w-4 h-4"/> Add Lesson</button>
+                            <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 flex justify-between items-center">
+                                <button onClick={() => addLesson(module.id)} className="text-sm text-pink-500 font-semibold flex items-center gap-2"><PlusCircleIcon className="w-4 h-4"/> Add Lesson</button>
+                                <button onClick={() => setEditingQuiz({ type: 'module', id: module.id, data: module.quiz })} className="text-sm text-blue-500 font-semibold flex items-center gap-2"><EditIcon className="w-4 h-4"/> {module.quiz ? 'Edit Module Quiz' : 'Add Module Quiz'}</button>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
              <LessonEditModal isOpen={!!editingLesson} onClose={() => setEditingLesson(null)} lesson={editingLesson} onSave={saveLesson} />
+             {editingQuiz && (
+                 <QuizEditorModal 
+                    isOpen={!!editingQuiz}
+                    onClose={() => setEditingQuiz(null)}
+                    quizData={editingQuiz.data}
+                    onSave={saveQuiz}
+                    title={editingQuiz.type === 'final' ? 'Final Exam Editor' : 'Module Quiz Editor'}
+                 />
+             )}
         </div>
     );
 };

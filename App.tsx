@@ -8,6 +8,7 @@ import { ManagementPages } from './pages/CertificationPage';
 import { supabase } from './supabaseClient';
 import { Auth } from './components/Auth';
 import * as api from './supabaseApi';
+import { XIcon } from './components/Icons';
 
 type View = SidebarView;
 
@@ -57,6 +58,22 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }> = ({ isOpen, onClose, title, children, footer }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-xl font-bold">{title}</h3>
+                    <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-6 h-6" /></button>
+                </div>
+                <div className="p-6 flex-grow overflow-y-auto">{children}</div>
+                {footer && <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl">{footer}</div>}
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
   const [authState, authDispatch] = useReducer(authReducer, initialState);
@@ -78,6 +95,7 @@ const App: React.FC = () => {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [isCertificationModalOpen, setIsCertificationModalOpen] = useState(false);
   
   useEffect(() => {
     let isMounted = true;
@@ -243,30 +261,43 @@ const App: React.FC = () => {
     closeMobileMenu();
   };
   
+  const handleCreateCourse = (withCertification: boolean) => {
+    if (authState.user) {
+        const newCourse: Course = {
+            id: `new-course-${Date.now()}`,
+            title: '',
+            description: '',
+            thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0',
+            categoryId: categories[0]?.id || '',
+            instructorId: authState.user.id,
+            instructorName: `${authState.user.firstName} ${authState.user.lastName}`,
+            modules: [],
+            totalLessons: 0,
+            estimatedDuration: 0,
+            hasQuizzes: false,
+            isCertificationCourse: withCertification,
+        };
+
+        if (withCertification) {
+            newCourse.finalExam = { questions: [], passingScore: 80 };
+            newCourse.certificationPassRate = 80;
+        }
+
+        setEditingCourse(newCourse);
+        setCurrentView('course-editor');
+        setIsCertificationModalOpen(false);
+    }
+  };
+
   const handleEditCourse = (course: Course | null) => {
+      closeMobileMenu();
       if (course) {
         setEditingCourse(course);
+        setCurrentView('course-editor');
       } else {
-        // Create a new, blank course object for the editor
-        if (authState.user) {
-            setEditingCourse({
-                id: `new-course-${Date.now()}`,
-                title: '',
-                description: '',
-                thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', // default placeholder
-                categoryId: categories[0]?.id || null,
-                instructorId: authState.user.id,
-                instructorName: `${authState.user.firstName} ${authState.user.lastName}`,
-                modules: [],
-                totalLessons: 0,
-                estimatedDuration: 0,
-                hasQuizzes: false,
-                certificationPassRate: 80,
-            });
-        }
+        // This is a new course, open the modal to ask about certification.
+        setIsCertificationModalOpen(true);
       }
-      setCurrentView('course-editor');
-      closeMobileMenu();
   };
 
   const handleExitCourseEditor = () => {
@@ -536,6 +567,32 @@ const App: React.FC = () => {
       }
       return (
         <div className="min-h-screen flex">
+          <Modal
+                isOpen={isCertificationModalOpen}
+                onClose={() => setIsCertificationModalOpen(false)}
+                title="Create New Course"
+            >
+                <div className="text-center">
+                    <h4 className="text-lg font-semibold mb-2">Will this course offer a certificate upon completion?</h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                        Certification courses require a final exam. General courses are for informational purposes only and will not grant a certificate.
+                    </p>
+                </div>
+                <div className="flex justify-center gap-4 mt-8">
+                    <button 
+                        onClick={() => handleCreateCourse(false)}
+                        className="bg-gray-200 dark:bg-gray-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                    >
+                        No, it's a general course
+                    </button>
+                    <button 
+                        onClick={() => handleCreateCourse(true)}
+                        className="bg-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-pink-600 transition-colors"
+                    >
+                        Yes, add a final exam
+                    </button>
+                </div>
+            </Modal>
           <Sidebar 
             userRole={authState.user.role} 
             viewAsRole={authState.viewAsRole}
