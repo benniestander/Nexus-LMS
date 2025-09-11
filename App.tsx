@@ -533,6 +533,8 @@ const App: React.FC = () => {
         onDeleteCategory: handleDeleteCategory,
         onDeleteCourse: handleOpenDeleteConfirm,
         onToggleCourseVisibility: handleToggleCourseVisibility,
+        // FIX: Add missing onNavigate prop to fix TypeScript errors.
+        onNavigate: handleNavigate,
     };
 
     if (currentView === 'course-editor') {

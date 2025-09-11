@@ -33,11 +33,18 @@ const StatCard: React.FC<{ icon: React.ReactNode; value: string | number; label:
     </div>
 );
 
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }> = ({ isOpen, onClose, title, children, footer }) => {
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode, size?: 'md' | 'lg' | 'xl' }> = ({ isOpen, onClose, title, children, footer, size = 'lg' }) => {
     if (!isOpen) return null;
+
+    const sizeClasses = {
+        md: 'max-w-md',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl',
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-xl font-bold">{title}</h3>
                     <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-6 h-6" /></button>
@@ -255,9 +262,11 @@ const InboxPage: React.FC<{
   enrollments: Enrollment[];
   onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
   onUpdateMessages: (messages: Message[]) => void;
-}> = ({ user, conversations, messages, allUsers, courses, enrollments, onSendMessage, onUpdateMessages }) => {
+  onNavigate: (view: View) => void;
+}> = ({ user, conversations, messages, allUsers, courses, enrollments, onSendMessage, onUpdateMessages, onNavigate }) => {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [isComposing, setIsComposing] = useState(false);
+    const [replyContent, setReplyContent] = useState('');
 
     const usersById = useMemo(() => new Map(allUsers.map(u => [u.id, u])), [allUsers]);
     
@@ -267,7 +276,8 @@ const InboxPage: React.FC<{
                 const otherParticipantId = convo.participantIds.find(id => id !== user.id);
                 const otherParticipant = usersById.get(otherParticipantId || '');
                 const lastMessage = messages.filter(m => m.conversationId === convo.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-                return { ...convo, otherParticipant, lastMessage };
+                const isUnread = lastMessage && !lastMessage.isRead && lastMessage.senderId !== user.id;
+                return { ...convo, otherParticipant, lastMessage, isUnread };
             })
             .filter(c => c.lastMessage && c.otherParticipant)
             .sort((a, b) => new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime());
@@ -281,14 +291,35 @@ const InboxPage: React.FC<{
     const handleConversationSelect = (convoId: string) => {
         setSelectedConversationId(convoId);
         setIsComposing(false);
-        // Mark messages as read
-        const updatedMessages = messages.map(m => m.conversationId === convoId && m.senderId !== user.id ? { ...m, isRead: true } : m);
-        onUpdateMessages(updatedMessages);
+        const unreadMessageIds = messages
+            .filter(m => m.conversationId === convoId && m.senderId !== user.id && !m.isRead)
+            .map(m => m.id);
+            
+        if (unreadMessageIds.length > 0) {
+            // Optimistically update UI
+            const updatedMessages = messages.map(m => unreadMessageIds.includes(m.id) ? { ...m, isRead: true } : m);
+            onUpdateMessages(updatedMessages);
+
+            // Update in backend
+            supabase.from('messages').update({ is_read: true }).in('id', unreadMessageIds).then(({ error }) => {
+                if(error) console.error("Failed to mark messages as read:", error);
+            });
+        }
     };
 
     const handleSendMessage = (recipientIds: string[], subject: string, content: string) => {
         onSendMessage(recipientIds, subject, content);
         setIsComposing(false);
+    };
+
+    const handleReply = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!replyContent.trim() || !selectedConversationId) return;
+        const currentConvo = relevantConversations.find(c => c.id === selectedConversationId);
+        if (!currentConvo || !currentConvo.otherParticipant) return;
+
+        onSendMessage([currentConvo.otherParticipant.id], '', replyContent);
+        setReplyContent('');
     };
     
     const ComposeView: React.FC<{ onCancel: () => void; onSend: (recipientIds: string[], subject: string, content: string) => void }> = ({ onCancel, onSend }) => {
@@ -297,11 +328,20 @@ const InboxPage: React.FC<{
         const [content, setContent] = useState('');
 
         const instructorCourses = useMemo(() => courses.filter(c => c.instructorId === user.id), [courses, user.id]);
-        const studentInstructors = useMemo(() => {
+        
+        const myStudents = useMemo(() => {
+            if (user.role === Role.STUDENT) return [];
+            const instructorCourseIds = instructorCourses.map(c => c.id);
+            const studentIds = new Set(enrollments.filter(e => instructorCourseIds.includes(e.courseId)).map(e => e.userId));
+            return allUsers.filter(u => studentIds.has(u.id));
+        }, [user, instructorCourses, enrollments, allUsers]);
+
+        const myInstructors = useMemo(() => {
+            if (user.role !== Role.STUDENT) return [];
             const enrolledCourseIds = enrollments.filter(e => e.userId === user.id).map(e => e.courseId);
             const instructorIds = new Set(courses.filter(c => enrolledCourseIds.includes(c.id)).map(c => c.instructorId));
             return allUsers.filter(u => instructorIds.has(u.id));
-        }, [courses, allUsers, enrollments, user.id]);
+        }, [user, enrollments, courses, allUsers]);
 
         const canSendMessage = recipients.length > 0 && content.trim() !== '';
 
@@ -312,13 +352,9 @@ const InboxPage: React.FC<{
                      <div>
                          <label className="font-semibold block mb-2">To:</label>
                          <select multiple value={recipients} onChange={e => setRecipients(Array.from(e.target.selectedOptions, option => option.value))} className="w-full p-2 border rounded-lg h-40 dark:bg-gray-700 dark:border-gray-600">
-                            {instructorCourses.map(course => (
-                                <optgroup key={course.id} label={course.title}>
-                                    {allUsers.filter(u => u.role === Role.STUDENT).map(student => (
-                                        <option key={student.id} value={student.id}>{student.firstName} {student.lastName}</option>
-                                    ))}
-                                </optgroup>
-                            ))}
+                             {myStudents.map(student => (
+                                 <option key={student.id} value={student.id}>{student.firstName} {student.lastName}</option>
+                             ))}
                          </select>
                      </div>
                  ) : (
@@ -326,7 +362,7 @@ const InboxPage: React.FC<{
                         <label className="font-semibold block mb-2">To:</label>
                         <select value={recipients[0] || ''} onChange={e => setRecipients([e.target.value])} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                             <option value="" disabled>Select an instructor</option>
-                            {studentInstructors.map(inst => <option key={inst.id} value={inst.id}>{inst.firstName} {inst.lastName} (Instructor)</option>)}
+                            {myInstructors.map(inst => <option key={inst.id} value={inst.id}>{inst.firstName} {inst.lastName} (Instructor)</option>)}
                         </select>
                     </div>
                  )}
@@ -341,27 +377,29 @@ const InboxPage: React.FC<{
     };
 
     return (
-        <div className="flex h-full">
-            <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <button onClick={() => setIsComposing(true)} className="w-full bg-pink-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-pink-600"><EditIcon className="w-5 h-5" /> New Message</button>
+        <div className="flex h-full bg-white dark:bg-gray-800">
+            <div className="w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h1 className="text-2xl font-bold flex items-center gap-3"><MailIcon className="w-7 h-7 text-pink-500" /> Inbox</h1>
+                    <button onClick={() => setIsComposing(true)} className="bg-pink-500 text-white font-bold p-2 rounded-lg flex items-center justify-center gap-2 hover:bg-pink-600" title="New Message"><EditIcon className="w-5 h-5" /></button>
                 </div>
                 <ul className="overflow-y-auto">
                     {relevantConversations.map(convo => (
-                        <li key={convo.id} onClick={() => handleConversationSelect(convo.id)} className={`p-4 cursor-pointer border-b border-gray-200 dark:border-gray-700 flex items-start gap-4 ${selectedConversationId === convo.id ? 'bg-gray-100 dark:bg-gray-700/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
+                        <li key={convo.id} onClick={() => handleConversationSelect(convo.id)} className={`p-4 cursor-pointer border-b border-gray-200 dark:border-gray-700 flex items-start gap-4 relative ${selectedConversationId === convo.id ? 'bg-gray-100 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                            {convo.isUnread && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 bg-pink-500 rounded-full"></div>}
                             <UserCircleIcon className="w-10 h-10 text-gray-400 flex-shrink-0" />
                             <div className="flex-grow min-w-0">
                                 <div className="flex justify-between">
                                     <p className="font-bold truncate">{convo.otherParticipant?.firstName} {convo.otherParticipant?.lastName}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{new Date(convo.lastMessage.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                 </div>
-                                <p className={`truncate text-sm ${!convo.lastMessage.isRead && convo.lastMessage.senderId !== user.id ? 'font-bold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{convo.lastMessage.content}</p>
+                                <p className={`truncate text-sm ${convo.isUnread ? 'font-bold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{convo.lastMessage.content}</p>
                             </div>
                         </li>
                     ))}
                 </ul>
             </div>
-            <div className="w-2/3 flex flex-col">
+            <div className="hidden md:flex w-2/3 flex-col bg-gray-50 dark:bg-gray-800/50">
                 {isComposing ? <ComposeView onCancel={() => setIsComposing(false)} onSend={handleSendMessage} /> : selectedConversationId ? (
                     <>
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -369,7 +407,8 @@ const InboxPage: React.FC<{
                         </div>
                         <div className="flex-grow p-6 overflow-y-auto space-y-4">
                             {selectedConversationMessages.map(msg => (
-                                <div key={msg.id} className={`flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
+                                <div key={msg.id} className={`flex items-end gap-3 ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
+                                    {msg.senderId !== user.id && <UserCircleIcon className="w-8 h-8 text-gray-400 flex-shrink-0" />}
                                     <div className={`max-w-xl px-4 py-3 rounded-2xl ${msg.senderId === user.id ? 'bg-pink-500 text-white rounded-br-none' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}>
                                         <p>{msg.content}</p>
                                         <p className={`text-xs mt-1 ${msg.senderId === user.id ? 'text-pink-100' : 'text-gray-500 dark:text-gray-400'} text-right`}>{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
@@ -377,9 +416,9 @@ const InboxPage: React.FC<{
                                 </div>
                             ))}
                         </div>
-                        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-                             <form onSubmit={e => { e.preventDefault(); onSendMessage([relevantConversations.find(c=>c.id===selectedConversationId)!.otherParticipant!.id], '', (e.target as any).message.value); (e.target as any).message.value = ''; }} className="flex gap-4">
-                                <input name="message" type="text" placeholder="Type a message..." className="w-full p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600" />
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                             <form onSubmit={handleReply} className="flex gap-4">
+                                <input name="message" type="text" placeholder="Type a message..." value={replyContent} onChange={e => setReplyContent(e.target.value)} className="w-full p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600" />
                                 <button type="submit" className="bg-pink-500 text-white p-3 rounded-lg"><SendIcon className="w-6 h-6" /></button>
                             </form>
                         </div>
@@ -398,7 +437,7 @@ const InboxPage: React.FC<{
     );
 };
 
-const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Course[] }> = ({ events }) => {
+const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Course[] }> = ({ events, user }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
 
     const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -407,7 +446,7 @@ const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Cou
     const daysInMonth = endOfMonth.getDate();
 
     const calendarGrid = useMemo(() => {
-        const grid = [];
+        const grid: (Date | null)[] = [];
         // Add padding days from previous month
         for (let i = 0; i < startDay; i++) {
             grid.push(null);
@@ -421,13 +460,14 @@ const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Cou
 
     const eventsByDate = useMemo(() => {
         const map = new Map<string, CalendarEvent[]>();
-        events.forEach(event => {
+        const userEvents = events.filter(e => e.userId === user.id); // Filter events for current user
+        userEvents.forEach(event => {
             const dateStr = event.date; // YYYY-MM-DD
             if (!map.has(dateStr)) map.set(dateStr, []);
             map.get(dateStr)!.push(event);
         });
         return map;
-    }, [events]);
+    }, [events, user.id]);
     
     const changeMonth = (offset: number) => {
         setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
@@ -441,8 +481,8 @@ const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Cou
     const eventTypeColor = { deadline: 'bg-red-500', live_session: 'bg-blue-500', assignment: 'bg-yellow-500' };
 
     return (
-        <div className="p-4 md:p-8">
-             <div className="flex justify-between items-center mb-8">
+        <div className="p-4 md:p-8 h-full flex flex-col">
+             <div className="flex justify-between items-center mb-8 flex-shrink-0">
                 <div className="flex items-center gap-4">
                     <CalendarIcon className="w-10 h-10 text-pink-500" />
                     <h1 className="text-4xl font-bold">Calendar</h1>
@@ -453,16 +493,16 @@ const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Cou
                     <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><ChevronRightIcon className="w-6 h-6" /></button>
                 </div>
             </div>
-            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="flex-grow grid grid-cols-7 grid-rows-6 gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} className="text-center font-semibold p-3 bg-white dark:bg-gray-800 text-sm">{day}</div>
                 ))}
                 {calendarGrid.map((date, index) => (
-                    <div key={index} className="bg-white dark:bg-gray-800 p-2 h-36 flex flex-col overflow-hidden">
+                    <div key={index} className="bg-white dark:bg-gray-800 p-2 flex flex-col overflow-hidden">
                         {date && (
                             <>
                                 <span className={`font-semibold text-sm ${isToday(date) ? 'bg-pink-500 text-white rounded-full w-7 h-7 flex items-center justify-center' : ''}`}>{date.getDate()}</span>
-                                <div className="mt-1 space-y-1 overflow-y-auto">
+                                <div className="mt-1 space-y-1 overflow-y-auto flex-grow">
                                     {eventsByDate.get(date.toISOString().split('T')[0])?.map(event => (
                                         <div key={event.id} className="text-xs p-1 rounded-md flex items-center gap-2 bg-gray-100 dark:bg-gray-700/50">
                                             <span className={`w-2 h-2 rounded-full ${eventTypeColor[event.type]}`}></span>
@@ -707,8 +747,141 @@ const UserManagementPage: React.FC<{ users: User[], onRefetchData: () => void, o
 
 // More placeholder pages
 const AnalyticsPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Analytics</h1><p className="mt-4">Analytics dashboard with charts and key metrics will be displayed here.</p></div>;
-const StudentManagementPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Student Management</h1><p className="mt-4">A view for instructors to see their students' progress and engagement.</p></div>;
-const LiveSessionsPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Live Sessions</h1><p className="mt-4">Instructors can schedule and manage live video sessions here.</p></div>;
+
+const StudentManagementPage: React.FC<{ user: User; courses: Course[]; allUsers: User[]; enrollments: Enrollment[]; onNavigate: (view: 'inbox') => void }> = ({ user, courses, allUsers, enrollments, onNavigate }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    
+    const instructorCourseIds = useMemo(() => {
+        if (user.role === Role.ADMIN) return courses.map(c => c.id);
+        return courses.filter(c => c.instructorId === user.id).map(c => c.id);
+    }, [user, courses]);
+
+    const studentData = useMemo(() => {
+        const studentEnrollments = enrollments.filter(e => instructorCourseIds.includes(e.courseId));
+        const studentIds = new Set(studentEnrollments.map(e => e.userId));
+        
+        return allUsers
+            .filter(u => u.role === Role.STUDENT && studentIds.has(u.id))
+            .map(student => {
+                const studentEnrolls = studentEnrollments.filter(e => e.userId === student.id);
+                const avgProgress = studentEnrolls.length > 0 ? studentEnrolls.reduce((sum, e) => sum + e.progress, 0) / studentEnrolls.length : 0;
+                return {
+                    ...student,
+                    enrolledCount: studentEnrolls.length,
+                    avgProgress: Math.round(avgProgress),
+                };
+            });
+    }, [allUsers, enrollments, instructorCourseIds]);
+
+    const filteredStudents = useMemo(() => {
+        if (!searchTerm) return studentData;
+        const lowerSearch = searchTerm.toLowerCase();
+        return studentData.filter(s =>
+            s.firstName.toLowerCase().includes(lowerSearch) ||
+            s.lastName.toLowerCase().includes(lowerSearch) ||
+            s.email.toLowerCase().includes(lowerSearch)
+        );
+    }, [searchTerm, studentData]);
+
+    return (
+        <div className="p-4 md:p-8">
+            <div className="flex items-center gap-4 mb-8"><UsersIcon className="w-10 h-10 text-pink-500" /><h1 className="text-4xl font-bold">Student Management</h1></div>
+            <div className="mb-6">
+                <div className="relative">
+                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" placeholder="Search students by name or email..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full max-w-lg p-3 pl-12 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                </div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-700"><tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"><th className="p-4">Name</th><th className="p-4">Email</th><th className="p-4">Courses Enrolled</th><th className="p-4">Average Progress</th><th className="p-4">Actions</th></tr></thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {filteredStudents.map(student => (
+                            <tr key={student.id}>
+                                <td className="p-4 font-semibold">{student.firstName} {student.lastName}</td>
+                                <td className="p-4">{student.email}</td>
+                                <td className="p-4">{student.enrolledCount}</td>
+                                <td className="p-4"><ProgressBar progress={student.avgProgress} /></td>
+                                <td className="p-4"><button onClick={() => onNavigate('inbox')} className="p-2 text-gray-500 hover:text-pink-500"><MessageSquareIcon className="w-5 h-5" /></button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+const LiveSessionsPage: React.FC<{ user: User, courses: Course[], liveSessions: LiveSession[], onScheduleSession: (session: Omit<LiveSession, 'id'>) => void, onDeleteSession: (sessionId: string) => void }> = ({ user, courses, liveSessions, onScheduleSession, onDeleteSession }) => {
+    const [isScheduling, setIsScheduling] = useState(false);
+    const [formState, setFormState] = useState({ title: '', description: '', date: '', time: '', duration: 60, audience: 'all' });
+
+    const instructorCourses = courses.filter(c => c.instructorId === user.id);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const dateTime = `${formState.date}T${formState.time}:00`;
+        onScheduleSession({ ...formState, dateTime, instructorId: user.id });
+        setIsScheduling(false);
+        setFormState({ title: '', description: '', date: '', time: '', duration: 60, audience: 'all' });
+    };
+
+    const upcomingSessions = liveSessions.filter(s => new Date(s.dateTime) >= new Date()).sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    const pastSessions = liveSessions.filter(s => new Date(s.dateTime) < new Date()).sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+
+    return (
+        <div className="p-4 md:p-8">
+            <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4"><VideoIcon className="w-10 h-10 text-pink-500" /><h1 className="text-4xl font-bold">Live Sessions</h1></div>
+                <button onClick={() => setIsScheduling(true)} className="bg-pink-500 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 hover:bg-pink-600"><PlusCircleIcon className="w-6 h-6" /> Schedule Session</button>
+            </div>
+
+            <h2 className="text-2xl font-bold mb-4">Upcoming Sessions</h2>
+            <div className="space-y-4">
+                {upcomingSessions.length > 0 ? upcomingSessions.map(session => (
+                    <div key={session.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex justify-between items-center">
+                        <div>
+                            <p className="font-bold">{session.title}</p>
+                            <p className="text-sm text-gray-500">{new Date(session.dateTime).toLocaleString()}</p>
+                        </div>
+                        <button onClick={() => onDeleteSession(session.id)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full"><Trash2Icon className="w-5 h-5"/></button>
+                    </div>
+                )) : <p className="text-gray-500">No upcoming sessions scheduled.</p>}
+            </div>
+
+            <h2 className="text-2xl font-bold mt-8 mb-4">Past Sessions</h2>
+            <div className="space-y-4">
+                 {pastSessions.length > 0 ? pastSessions.map(session => (
+                    <div key={session.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm opacity-70">
+                        <p className="font-bold">{session.title}</p>
+                        <p className="text-sm text-gray-500">{new Date(session.dateTime).toLocaleString()}</p>
+                    </div>
+                )) : <p className="text-gray-500">No past sessions.</p>}
+            </div>
+
+            <Modal isOpen={isScheduling} onClose={() => setIsScheduling(false)} title="Schedule New Live Session">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div><label className="font-semibold">Title</label><input type="text" value={formState.title} onChange={e => setFormState({...formState, title: e.target.value})} required className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" /></div>
+                    <div><label className="font-semibold">Description</label><textarea value={formState.description} onChange={e => setFormState({...formState, description: e.target.value})} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" /></div>
+                    <div className="flex gap-4">
+                        <div className="flex-1"><label className="font-semibold">Date</label><input type="date" value={formState.date} onChange={e => setFormState({...formState, date: e.target.value})} required className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" /></div>
+                        <div className="flex-1"><label className="font-semibold">Time</label><input type="time" value={formState.time} onChange={e => setFormState({...formState, time: e.target.value})} required className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" /></div>
+                    </div>
+                     <div><label className="font-semibold">Duration (minutes)</label><input type="number" value={formState.duration} onChange={e => setFormState({...formState, duration: parseInt(e.target.value)})} required className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600" /></div>
+                     <div>
+                        <label className="font-semibold">Audience</label>
+                        <select value={formState.audience} onChange={e => setFormState({...formState, audience: e.target.value})} className="w-full mt-1 p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                            <option value="all">All Users</option>
+                            {instructorCourses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
+                        </select>
+                    </div>
+                    <div className="text-right pt-4"><button type="submit" className="bg-pink-500 text-white font-bold py-2 px-6 rounded-lg">Schedule</button></div>
+                </form>
+            </Modal>
+        </div>
+    );
+};
+
 const PlatformSettingsPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Platform Settings</h1><p className="mt-4">Admins can manage global platform settings like branding, integrations, etc.</p></div>;
 
 // --- New helpers for category tree rendering ---
@@ -1332,6 +1505,7 @@ interface ManagementPagesProps {
   onAddCategory: (category: { name: string; parentId: string | null; }) => Promise<{ success: boolean; data?: Category; error?: any; }>;
   onUpdateCategory: (category: { id: string; name: string; parentId: string | null; }) => Promise<void>;
   onDeleteCategory: (categoryId: string) => Promise<void>;
+  onNavigate: (view: View) => void; // Added for navigation from within pages
 }
 
 export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
@@ -1347,7 +1521,7 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
     case 'user-management':
         return <UserManagementPage users={props.allUsers} onRefetchData={props.onRefetchData} onSaveUserProfile={props.onSaveUserProfile} />;
     case 'inbox':
-        return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} courses={props.courses} enrollments={props.enrollments} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} />;
+        return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} courses={props.courses} enrollments={props.enrollments} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} onNavigate={props.onNavigate as any} />;
     case 'calendar':
         return <CalendarPage events={props.calendarEvents} user={props.user} courses={props.courses} />;
     case 'history':
@@ -1357,9 +1531,9 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
     case 'analytics':
         return <AnalyticsPage />;
     case 'student-management':
-        return <StudentManagementPage />;
+        return <StudentManagementPage user={props.user} courses={props.courses} allUsers={props.allUsers} enrollments={props.enrollments} onNavigate={props.onNavigate as any} />;
     case 'live-sessions':
-        return <LiveSessionsPage />;
+        return <LiveSessionsPage user={props.user} courses={props.courses} liveSessions={props.liveSessions} onScheduleSession={props.onScheduleSession} onDeleteSession={props.onDeleteSession} />;
     case 'platform-settings':
         return <PlatformSettingsPage />;
     case 'help':
