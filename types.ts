@@ -148,17 +148,6 @@ export interface CalendarEvent {
   liveSessionId?: string;
 }
 
-export type HistoryAction = 'course_enrolled' | 'lesson_completed' | 'quiz_passed' | 'certificate_earned' | 'discussion_posted';
-
-export interface HistoryLog {
-  id: string;
-  userId: string;
-  action: HistoryAction;
-  targetId: string;
-  targetName: string;
-  timestamp: string;
-}
-
 export interface LiveSession {
   id: string;
   title: string;

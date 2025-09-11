@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, HistoryLog, HistoryAction, LiveSession, VideoProvider, VideoData, Category } from '../types';
+import { Course, Enrollment, User, Role, Lesson, Module, LessonType, Question, QuizData, Conversation, Message, CalendarEvent, LiveSession, VideoProvider, VideoData, Category } from '../types';
 import { AwardIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, ChevronDownIcon, ChevronUpIcon, EditIcon, FileTextIcon, GripVerticalIcon, PlusCircleIcon, SettingsIcon, Trash2Icon, UsersIcon, PlayCircleIcon, ClipboardListIcon, XIcon, SearchIcon, DownloadIcon, MailIcon, SendIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, MessageSquareIcon, VideoIcon, UserCircleIcon, BoldIcon, ItalicIcon, UnderlineIcon, ListIcon, ListOrderedIcon, ClockIcon } from '../components/Icons';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { CourseCard } from '../components/CourseCard';
@@ -515,43 +515,6 @@ const CalendarPage: React.FC<{ events: CalendarEvent[], user: User, courses: Cou
                     </div>
                 ))}
             </div>
-        </div>
-    );
-};
-
-const HistoryPage: React.FC<{ logs: HistoryLog[] }> = ({ logs }) => {
-    const getIconForAction = (action: HistoryAction) => {
-        switch (action) {
-            case 'course_enrolled': return <BookOpenIcon className="w-5 h-5 text-blue-500" />;
-            case 'lesson_completed': return <CheckCircle2Icon className="w-5 h-5 text-green-500" />;
-            case 'quiz_passed': return <ClipboardListIcon className="w-5 h-5 text-purple-500" />;
-            case 'certificate_earned': return <AwardIcon className="w-5 h-5 text-yellow-500" />;
-            case 'discussion_posted': return <MessageSquareIcon className="w-5 h-5 text-gray-500" />;
-            default: return null;
-        }
-    };
-
-    const formatActionText = (action: HistoryAction) => {
-        return action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    };
-    
-    return (
-        <div className="p-4 md:p-8">
-            <div className="flex items-center gap-4 mb-8">
-                <HistoryIcon className="w-10 h-10 text-pink-500" />
-                <h1 className="text-4xl font-bold">Activity History</h1>
-            </div>
-            <ul className="space-y-4">
-                {logs.map(log => (
-                    <li key={log.id} className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-                        <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{getIconForAction(log.action)}</div>
-                        <div className="flex-grow">
-                            <p className="font-semibold">{formatActionText(log.action)}: <span className="font-normal">{log.targetName}</span></p>
-                        </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{new Date(log.timestamp).toLocaleString()}</p>
-                    </li>
-                ))}
-            </ul>
         </div>
     );
 };
@@ -1488,7 +1451,6 @@ interface ManagementPagesProps {
   onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
   onUpdateMessages: (messages: Message[]) => void;
   calendarEvents: CalendarEvent[];
-  historyLogs: HistoryLog[];
   liveSessions: LiveSession[];
   onScheduleSession: (session: Omit<LiveSession, 'id'>) => void;
   onDeleteSession: (sessionId: string) => void;
@@ -1524,8 +1486,6 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
         return <InboxPage user={props.user} conversations={props.conversations} messages={props.messages} allUsers={props.allUsers} courses={props.courses} enrollments={props.enrollments} onSendMessage={props.onSendMessage} onUpdateMessages={props.onUpdateMessages} onNavigate={props.onNavigate as any} />;
     case 'calendar':
         return <CalendarPage events={props.calendarEvents} user={props.user} courses={props.courses} />;
-    case 'history':
-        return <HistoryPage logs={props.historyLogs} />;
     case 'profile':
         return <ProfilePage user={props.user} onSaveProfile={props.onSaveUserProfile} onUpdatePassword={props.onUpdatePassword} />;
     case 'analytics':

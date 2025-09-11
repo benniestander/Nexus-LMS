@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category, QuizAttempt } from './types';
+import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, LiveSession, Category, QuizAttempt } from './types';
 
 // ====================================================================================
 // ===== DATA TRANSFORMATION UTILS
@@ -55,10 +55,6 @@ export const getInitialData = async (user: User) => {
             ? supabase.from('calendar_events').select('*')
             : supabase.from('calendar_events').select('*').eq('user_id', user.id);
 
-        const historyLogsPromise = user.role === Role.ADMIN
-            ? supabase.from('history_logs').select('*').order('timestamp', { ascending: false })
-            : supabase.from('history_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false });
-
         // For non-admins, RLS policies should restrict which users they can see.
         const usersPromise = supabase.from('profiles').select('*');
 
@@ -71,7 +67,6 @@ export const getInitialData = async (user: User) => {
             usersRes,
             conversationsRes,
             calendarEventsRes,
-            historyLogsRes,
             liveSessionsRes,
             categoriesRes,
         ] = await Promise.all([
@@ -82,13 +77,12 @@ export const getInitialData = async (user: User) => {
             usersPromise,
             conversationsPromise,
             calendarEventsPromise,
-            historyLogsPromise,
             supabase.from('live_sessions').select('*'),
             supabase.from('categories').select('*').order('name'),
         ]);
 
         // 3. Centralized error checking for the first batch
-        const firstBatchResults = { coursesRes, modulesRes, lessonsRes, enrollmentsRes, usersRes, conversationsRes, calendarEventsRes, historyLogsRes, liveSessionsRes, categoriesRes };
+        const firstBatchResults = { coursesRes, modulesRes, lessonsRes, enrollmentsRes, usersRes, conversationsRes, calendarEventsRes, liveSessionsRes, categoriesRes };
         for (const [key, result] of Object.entries(firstBatchResults)) {
             if (result.error) {
                 console.error(`Error fetching ${key}:`, result.error);
@@ -142,7 +136,6 @@ export const getInitialData = async (user: User) => {
             conversations: snakeToCamel(conversationsRes.data || []),
             messages: snakeToCamel(messagesRes.data || []),
             calendarEvents: snakeToCamel(calendarEventsRes.data || []),
-            historyLogs: snakeToCamel(historyLogsRes.data || []),
             liveSessions: snakeToCamel(liveSessionsRes.data || []),
             categories: snakeToCamel(categoriesRes.data || []),
         };

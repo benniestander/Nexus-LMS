@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useReducer, useRef } from 'react';
-import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, HistoryLog, LiveSession, Category, QuizAttempt } from './types';
+import { Course, Enrollment, Role, User, Conversation, Message, CalendarEvent, LiveSession, Category, QuizAttempt } from './types';
 import { Header } from './components/Header';
 import { Sidebar, View as SidebarView } from './components/Sidebar';
 import { StudentDashboard } from './pages/StudentDashboard';
@@ -86,7 +86,6 @@ const App: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [historyLogs, setHistoryLogs] = useState<HistoryLog[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
 
   // --- UI State ---
@@ -118,7 +117,6 @@ const App: React.FC = () => {
                 setConversations(appData.conversations);
                 setMessages(appData.messages);
                 setCalendarEvents(appData.calendarEvents);
-                setHistoryLogs(appData.historyLogs);
                 setLiveSessions(appData.liveSessions);
                 authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
             }
@@ -225,7 +223,6 @@ const App: React.FC = () => {
             setConversations(data.conversations);
             setMessages(data.messages);
             setCalendarEvents(data.calendarEvents);
-            setHistoryLogs(data.historyLogs);
             setLiveSessions(data.liveSessions);
         }
       // Also refetch the user profile itself in case the name/role was changed
@@ -508,7 +505,6 @@ const App: React.FC = () => {
         conversations,
         messages,
         calendarEvents,
-        historyLogs,
         liveSessions,
         categories,
         selectedCategoryId,

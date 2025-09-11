@@ -14,7 +14,6 @@ export type View =
   | 'certifications'
   | 'inbox'
   | 'calendar'
-  | 'history'
   | 'profile' // Added profile to the view types
   | 'player' // internal view
   | 'student-management'
@@ -112,7 +111,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
       { view: 'dashboard', icon: <LayoutDashboardIcon />, label: 'Dashboard' },
       { view: 'inbox', icon: <MailIcon />, label: 'Inbox' },
       { view: 'calendar', icon: <CalendarIcon />, label: 'Calendar' },
-      { view: 'history', icon: <HistoryIcon />, label: 'History' },
       { view: 'certifications', icon: <AwardIcon />, label: 'Certifications' },
       { view: 'help', icon: <LifeBuoyIcon />, label: 'Help' },
     ],
@@ -124,7 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
       { view: 'live-sessions', icon: <VideoIcon />, label: 'Live Sessions' },
       { view: 'inbox', icon: <MailIcon />, label: 'Inbox' },
       { view: 'calendar', icon: <CalendarIcon />, label: 'Calendar' },
-      { view: 'history', icon: <HistoryIcon />, label: 'History' },
       { view: 'analytics', icon: <BarChart2Icon />, label: 'Analytics' },
     ],
     [Role.ADMIN]: [
@@ -141,7 +138,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
       { view: 'live-sessions', icon: <VideoIcon />, label: 'Live Sessions' },
       { view: 'inbox', icon: <MailIcon />, label: 'Inbox' },
       { view: 'calendar', icon: <CalendarIcon />, label: 'Calendar' },
-      { view: 'history', icon: <HistoryIcon />, label: 'History' },
     ],
   };
 
