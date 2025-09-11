@@ -1,7 +1,8 @@
+
 import React, { useMemo } from 'react';
 import { Course, Enrollment, User, Role, EngagementData, Category } from '../types';
 import { CourseCard } from '../components/CourseCard';
-import { UsersIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, PlusCircleIcon, LayoutDashboardIcon } from '../components/Icons';
+import { UsersIcon, BarChart2Icon, BookOpenIcon, CheckCircle2Icon, PlusCircleIcon, LayoutDashboardIcon, EditIcon } from '../components/Icons';
 
 // NOTE: Chart data is now derived from props or placeholder, not mock file.
 const generatePlaceholderChartData = (label: string, length = 6) => {
@@ -211,7 +212,13 @@ const InstructorDashboard: React.FC<{
                                         <p className="font-semibold text-blue-600 dark:text-blue-400">{course.title}</p>
                                         <p className="text-sm text-gray-500 dark:text-gray-400">{categoryMap.get(course.categoryId)}</p>
                                     </div>
-                                    <button onClick={() => onNavigate('my-courses')} className="text-sm font-semibold text-pink-500 hover:text-pink-600">Manage</button>
+                                    <button 
+                                        onClick={() => onEditCourse(course)} 
+                                        className="flex items-center gap-2 text-sm font-semibold text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300 bg-pink-100/50 dark:bg-pink-900/30 hover:bg-pink-100 dark:hover:bg-pink-900/50 px-3 py-1.5 rounded-lg transition-all"
+                                    >
+                                        <EditIcon className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </button>
                                 </li>
                             ))
                         ) : (

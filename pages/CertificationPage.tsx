@@ -1024,7 +1024,13 @@ const CourseEditor: React.FC<{
                 <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md space-y-4 self-start sticky top-28">
                     <h2 className="text-xl font-bold">Course Details</h2>
                     <div><label className="font-semibold">Title</label><input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
-                    <div><label className="font-semibold">Description</label><textarea value={course.description} onChange={e => updateCourseField('description', e.target.value)} rows={4} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
+                    
+                    <RichTextEditor
+                        label="Description"
+                        value={course.description}
+                        onChange={value => updateCourseField('description', value)}
+                    />
+
                     <div>
                         <label className="font-semibold">Category</label>
                         <select value={course.categoryId} onChange={e => updateCourseField('categoryId', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1">
