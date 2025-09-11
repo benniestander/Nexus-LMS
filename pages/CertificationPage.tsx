@@ -696,6 +696,156 @@ const StudentManagementPage: React.FC = () => <div className="p-8"><h1 className
 const LiveSessionsPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Live Sessions</h1><p className="mt-4">Instructors can schedule and manage live video sessions here.</p></div>;
 const PlatformSettingsPage: React.FC = () => <div className="p-8"><h1 className="text-4xl font-bold">Platform Settings</h1><p className="mt-4">Admins can manage global platform settings like branding, integrations, etc.</p></div>;
 
+// --- New helpers for category tree rendering ---
+interface CategoryNode extends Category {
+    children: CategoryNode[];
+}
+
+const buildCategoryTree = (items: Category[], parentId: string | null = null): CategoryNode[] => {
+    return items
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+            ...item,
+            children: buildCategoryTree(items, item.id)
+        }));
+};
+
+const renderCategoryOptions = (nodes: CategoryNode[], level: number = 0, excludeId: string | null = null): JSX.Element[] => {
+    return nodes.flatMap(node => {
+        if (node.id === excludeId) return [];
+        return [
+            <option key={node.id} value={node.id}>
+                {'\u00A0'.repeat(level * 4)}{node.name}
+            </option>,
+            ...renderCategoryOptions(node.children, level + 1, excludeId)
+        ];
+    });
+};
+
+const CategoriesPage: React.FC<{
+    categories: Category[];
+    courses: Course[];
+    onAddCategory: (category: { name: string; parentId: string | null; }) => Promise<any>;
+    onUpdateCategory: (category: { id: string; name: string; parentId: string | null; }) => Promise<void>;
+    onDeleteCategory: (categoryId: string) => Promise<void>;
+}> = ({ categories, courses, onAddCategory, onUpdateCategory, onDeleteCategory }) => {
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+    const [isAdding, setIsAdding] = useState(false);
+    
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
+    const [editingParentId, setEditingParentId] = useState<string | null>(null);
+
+    const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
+    const courseCountByCategoryId = useMemo(() => {
+        const counts = new Map<string, number>();
+        courses.forEach(course => {
+            counts.set(course.categoryId, (counts.get(course.categoryId) || 0) + 1);
+        });
+        return counts;
+    }, [courses]);
+
+    const handleAddNewCategory = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        setIsAdding(true);
+        await onAddCategory({ name: newCategoryName.trim(), parentId: newCategoryParentId });
+        setNewCategoryName('');
+        setNewCategoryParentId(null);
+        setIsAdding(false);
+    };
+    
+    const handleStartEdit = (category: Category) => {
+        setEditingCategoryId(category.id);
+        setEditingName(category.name);
+        setEditingParentId(category.parentId);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingCategoryId(null);
+    };
+    
+    const handleSaveEdit = async (id: string) => {
+        if (!editingName.trim()) return;
+        await onUpdateCategory({ id, name: editingName.trim(), parentId: editingParentId });
+        setEditingCategoryId(null);
+    };
+
+    const CategoryListItem: React.FC<{ node: CategoryNode; level: number }> = ({ node, level }) => {
+        const isEditing = editingCategoryId === node.id;
+        const count = courseCountByCategoryId.get(node.id) || 0;
+
+        return (
+            <li className={`border-t dark:border-gray-700 ${isEditing ? 'bg-gray-50 dark:bg-gray-700/50' : ''}`} style={{ paddingLeft: `${level * 1.5}rem`}}>
+                {isEditing ? (
+                    <div className="p-4 space-y-4">
+                        <input type="text" value={editingName} onChange={e => setEditingName(e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/>
+                        <select value={editingParentId || ''} onChange={e => setEditingParentId(e.target.value || null)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                            <option value="">— No Parent —</option>
+                            {renderCategoryOptions(categoryTree, 0, node.id)}
+                        </select>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={handleCancelEdit} className="text-sm font-semibold px-3 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                            <button onClick={() => handleSaveEdit(node.id)} className="text-sm font-semibold bg-pink-500 text-white px-3 py-1 rounded-md">Save</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-between p-4 group">
+                        <div>
+                            <p className="font-semibold text-gray-800 dark:text-gray-200">{node.name}</p>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+                                <button onClick={() => handleStartEdit(node)} className="text-sm text-pink-500 hover:underline">Edit</button>
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
+                                <button onClick={() => onDeleteCategory(node.id)} className="text-sm text-red-500 hover:underline">Delete</button>
+                            </div>
+                        </div>
+                        <span className="text-gray-500 dark:text-gray-400">{count}</span>
+                    </div>
+                )}
+                {node.children.length > 0 && (
+                    <ul>
+                        {node.children.map(child => <CategoryListItem key={child.id} node={child} level={level + 1} />)}
+                    </ul>
+                )}
+            </li>
+        );
+    };
+    
+    return (
+        <div className="p-4 md:p-8">
+            <div className="flex items-center gap-4 mb-8"><ClipboardListIcon className="w-10 h-10 text-pink-500" /><h1 className="text-4xl font-bold">Course Categories</h1></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1">
+                    <form onSubmit={handleAddNewCategory} className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md space-y-4 sticky top-28">
+                        <h2 className="text-xl font-bold">Add New Category</h2>
+                        <div>
+                            <label htmlFor="cat-name" className="font-semibold">Name</label>
+                            <input id="cat-name" type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/>
+                        </div>
+                        <div>
+                            <label htmlFor="cat-parent" className="font-semibold">Parent Category</label>
+                            <select id="cat-parent" value={newCategoryParentId || ''} onChange={e => setNewCategoryParentId(e.target.value || null)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="">— No Parent —</option>
+                                {renderCategoryOptions(categoryTree)}
+                            </select>
+                        </div>
+                        <button type="submit" disabled={isAdding} className="w-full bg-pink-500 text-white font-bold py-3 rounded-lg hover:bg-pink-600 disabled:bg-pink-400">
+                            {isAdding ? 'Adding...' : 'Add New Category'}
+                        </button>
+                    </form>
+                </div>
+                <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md">
+                    <div className="p-4 border-b dark:border-gray-700 flex justify-between font-semibold text-gray-600 dark:text-gray-400"><span>Name</span><span>Courses</span></div>
+                    <ul>
+                        {categoryTree.map(node => <CategoryListItem key={node.id} node={node} level={0} />)}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ====================================================================================
 // ===== COURSE EDITOR - A very large and complex component
 // ====================================================================================
@@ -772,34 +922,23 @@ const LessonEditModal: React.FC<{
     );
 };
 
-// --- New helpers for category tree rendering ---
-interface CategoryNode extends Category {
-    children: CategoryNode[];
-}
 
-const buildCategoryTree = (items: Category[], parentId: string | null = null): CategoryNode[] => {
-    return items
-        .filter(item => item.parentId === parentId)
-        .map(item => ({
-            ...item,
-            children: buildCategoryTree(items, item.id)
-        }));
-};
-
-const renderCategoryOptions = (nodes: CategoryNode[], level: number = 0): JSX.Element[] => {
-    return nodes.flatMap(node => [
-      <option key={node.id} value={node.id}>
-        {'\u00A0'.repeat(level * 4)}{node.name}
-      </option>,
-      ...renderCategoryOptions(node.children, level + 1)
-    ]);
-};
-
-const CourseEditor: React.FC<{ course: Course | null; user: User; onSave: (course: Course) => void; onExit: () => void; categories: Category[] }> = ({ course: initialCourse, user, onSave, onExit, categories }) => {
+const CourseEditor: React.FC<{
+    course: Course | null;
+    user: User;
+    onSave: (course: Course) => void;
+    onExit: () => void;
+    categories: Category[];
+    onAddCategory: (category: { name: string; parentId: string | null; }) => Promise<{ success: boolean; data?: Category; error?: any; }>;
+}> = ({ course: initialCourse, user, onSave, onExit, categories, onAddCategory }) => {
     const [course, setCourse] = useState<Course>(initialCourse || {
         id: `new-course-${Date.now()}`, title: '', description: '', thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', categoryId: categories[0]?.id || '', instructorId: user.id, instructorName: `${user.firstName} ${user.lastName}`, modules: [], totalLessons: 0, estimatedDuration: 0,
     });
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+    const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
+    const [newInlineCategoryName, setNewInlineCategoryName] = useState('');
+    const [newInlineCategoryParentId, setNewInlineCategoryParentId] = useState<string | null>(null);
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
 
     const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
 
@@ -853,6 +992,22 @@ const CourseEditor: React.FC<{ course: Course | null; user: User; onSave: (cours
         }
         setEditingLesson(null);
     };
+    
+    const handleAddInlineCategory = async () => {
+        if (!newInlineCategoryName.trim()) return;
+        setIsAddingCategory(true);
+        const result = await onAddCategory({
+            name: newInlineCategoryName.trim(),
+            parentId: newInlineCategoryParentId,
+        });
+        if (result.success && result.data) {
+            updateCourseField('categoryId', result.data.id);
+            setShowNewCategoryForm(false);
+            setNewInlineCategoryName('');
+            setNewInlineCategoryParentId(null);
+        }
+        setIsAddingCategory(false);
+    };
 
     return (
         <div className="p-4 md:p-8">
@@ -866,17 +1021,50 @@ const CourseEditor: React.FC<{ course: Course | null; user: User; onSave: (cours
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Course Details */}
-                <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md space-y-4">
+                <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md space-y-4 self-start sticky top-28">
                     <h2 className="text-xl font-bold">Course Details</h2>
-                    <div><label>Title</label><input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
-                    <div><label>Description</label><textarea value={course.description} onChange={e => updateCourseField('description', e.target.value)} rows={4} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
+                    <div><label className="font-semibold">Title</label><input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
+                    <div><label className="font-semibold">Description</label><textarea value={course.description} onChange={e => updateCourseField('description', e.target.value)} rows={4} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
                     <div>
-                        <label>Category</label>
+                        <label className="font-semibold">Category</label>
                         <select value={course.categoryId} onChange={e => updateCourseField('categoryId', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1">
+                             <option value="">Select a category</option>
                             {renderCategoryOptions(categoryTree)}
                         </select>
+                        {!showNewCategoryForm ? (
+                             <button type="button" onClick={() => setShowNewCategoryForm(true)} className="text-sm text-pink-500 mt-2 hover:underline">+ Add New Category</button>
+                        ) : (
+                            <div className="mt-2 p-4 border rounded-lg dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 space-y-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="New category name"
+                                    value={newInlineCategoryName}
+                                    onChange={e => setNewInlineCategoryName(e.target.value)}
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                                />
+                                <select 
+                                    value={newInlineCategoryParentId || ''} 
+                                    onChange={e => setNewInlineCategoryParentId(e.target.value || null)}
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                                >
+                                    <option value="">— Parent Category —</option>
+                                    {renderCategoryOptions(categoryTree)}
+                                </select>
+                                <div className="flex gap-2 justify-end pt-1">
+                                    <button type="button" onClick={() => setShowNewCategoryForm(false)} className="text-sm px-3 py-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                                    <button 
+                                        type="button" 
+                                        onClick={handleAddInlineCategory} 
+                                        disabled={isAddingCategory || !newInlineCategoryName.trim()}
+                                        className="text-sm font-semibold bg-pink-500 text-white px-3 py-1 rounded-md disabled:bg-gray-400"
+                                    >
+                                        {isAddingCategory ? 'Adding...' : 'Add'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <div><label>Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
+                    <div><label className="font-semibold">Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
                     <img src={course.thumbnail} alt="Thumbnail preview" className="w-full rounded-lg object-cover aspect-video mt-2" />
                 </div>
 
@@ -948,6 +1136,10 @@ interface ManagementPagesProps {
   onUpdatePassword: (newPassword: string) => Promise<void>;
   categories: Category[];
   selectedCategoryId: string | null;
+  // Category management
+  onAddCategory: (category: { name: string; parentId: string | null; }) => Promise<{ success: boolean; data?: Category; error?: any; }>;
+  onUpdateCategory: (category: { id: string; name: string; parentId: string | null; }) => Promise<void>;
+  onDeleteCategory: (categoryId: string) => Promise<void>;
 }
 
 export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
@@ -956,8 +1148,10 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
       return <CertificationsPage user={props.user} courses={props.courses} enrollments={props.enrollments} />;
     case 'my-courses':
         return <MyCoursesPage user={props.user} courses={props.courses} onEditCourse={props.onEditCourse} onSelectCourse={props.onSelectCourse} categories={props.categories} />;
+    case 'course-categories':
+        return <CategoriesPage categories={props.categories} courses={props.courses} onAddCategory={props.onAddCategory} onUpdateCategory={props.onUpdateCategory} onDeleteCategory={props.onDeleteCategory} />;
     case 'course-editor':
-        return <CourseEditor course={props.courseToEdit || null} user={props.user} onSave={props.onSave} onExit={props.onExit} categories={props.categories} />;
+        return <CourseEditor course={props.courseToEdit || null} user={props.user} onSave={props.onSave} onExit={props.onExit} categories={props.categories} onAddCategory={props.onAddCategory} />;
     case 'user-management':
         return <UserManagementPage users={props.allUsers} onRefetchData={props.onRefetchData} onSaveUserProfile={props.onSaveUserProfile} />;
     case 'inbox':

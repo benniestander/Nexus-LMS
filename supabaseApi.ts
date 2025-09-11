@@ -84,7 +84,7 @@ export const getInitialData = async (user: User) => {
             calendarEventsPromise,
             historyLogsPromise,
             supabase.from('live_sessions').select('*'),
-            supabase.from('categories').select('*'),
+            supabase.from('categories').select('*').order('name'),
         ]);
 
         // 3. Centralized error checking for the first batch
@@ -384,3 +384,49 @@ export const deleteSession = async (sessionId: string) => {
     }
     return { success: true };
 }
+
+export const addCategory = async (category: { name: string; parentId: string | null; }) => {
+    const { data, error } = await supabase
+        .from('categories')
+        .insert({ name: category.name, parent_id: category.parentId })
+        .select()
+        .single();
+    if (error) {
+        console.error('Error adding category:', error);
+        return { success: false, error };
+    }
+    return { success: true, data: snakeToCamel(data) };
+};
+
+export const updateCategory = async (category: { id: string; name: string; parentId: string | null; }) => {
+    const { data, error } = await supabase
+        .from('categories')
+        .update({ name: category.name, parent_id: category.parentId })
+        .eq('id', category.id)
+        .select()
+        .single();
+    if (error) {
+        console.error('Error updating category:', error);
+        return { success: false, error };
+    }
+    return { success: true, data: snakeToCamel(data) };
+};
+
+export const deleteCategory = async (categoryId: string) => {
+    // Check for child categories
+    const { data: children, error: childrenError } = await supabase.from('categories').select('id', { count: 'exact' }).eq('parent_id', categoryId);
+    if (childrenError) return { success: false, error: childrenError };
+    if ((children?.length || 0) > 0) return { success: false, error: { message: "Cannot delete a category that has child categories. Please reassign children first." } };
+
+    // Check for associated courses
+    const { data: courses, error: coursesError } = await supabase.from('courses').select('id', { count: 'exact' }).eq('category_id', categoryId);
+    if (coursesError) return { success: false, error: coursesError };
+    if ((courses?.length || 0) > 0) return { success: false, error: { message: "Cannot delete category. Reassign courses from this category first." } };
+
+    const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+    if (error) {
+        console.error('Error deleting category:', error);
+        return { success: false, error };
+    }
+    return { success: true };
+};

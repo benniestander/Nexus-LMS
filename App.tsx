@@ -368,6 +368,42 @@ const App: React.FC = () => {
     refetchData();
   };
 
+  const handleAddCategory = async (category: { name: string; parentId: string | null; }) => {
+    const result = await api.addCategory(category);
+    if (result.success) {
+        // Use a functional update to ensure the new category is available immediately
+        setCategories(prev => [...prev, result.data]);
+        // Also trigger a full refetch to ensure consistency, but don't wait for it
+        refetchData();
+    } else {
+        alert(`Error adding category: ${result.error?.message}`);
+    }
+    return result;
+  };
+
+  const handleUpdateCategory = async (category: { id: string; name: string; parentId: string | null; }) => {
+    const result = await api.updateCategory(category);
+    if (result.success) {
+        await refetchData();
+    } else {
+        alert(`Error updating category: ${result.error?.message}`);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+        const result = await api.deleteCategory(categoryId);
+        if (result.success) {
+            await refetchData();
+        } else if (result.error) {
+            alert(`Error deleting category: ${result.error.message}`);
+        }
+    } catch (error: any) {
+        alert(`Error: ${error.message}`);
+    }
+  };
+
+
   const getEnrollmentForCourse = (courseId: string): Enrollment => {
       if (!authState.user) throw new Error("User not logged in");
       const existingEnrollment = enrollments.find(e => e.courseId === courseId && e.userId === authState.user!.id);
@@ -387,36 +423,43 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!authState.user || !authState.viewAsRole) return null;
+    
+    // Common props for ManagementPages
+    const managementPagesProps = {
+        user: authState.user,
+        courses,
+        enrollments,
+        allUsers,
+        conversations,
+        messages,
+        calendarEvents,
+        historyLogs,
+        liveSessions,
+        categories,
+        selectedCategoryId,
+        onRefetchData: refetchData,
+        // FIX: Changed shorthand property to explicit key-value pair to match handler function names.
+        onSendMessage: handleSendMessage,
+        // FIX: Changed shorthand property to explicit key-value pair to match handler function names.
+        onUpdateMessages: handleUpdateMessages,
+        // FIX: Changed shorthand property to explicit key-value pair to match handler function names.
+        onScheduleSession: handleScheduleSession,
+        // FIX: Changed shorthand property to explicit key-value pair to match handler function names.
+        onDeleteSession: handleDeleteSession,
+        onEditCourse: handleEditCourse,
+        onSelectCourse: handleSelectCourse,
+        onSaveUserProfile: handleSaveUserProfile,
+        onUpdatePassword: handleUpdatePassword,
+        onSave: handleSaveCourse,
+        onExit: handleExitCourseEditor,
+        courseToEdit: editingCourse,
+        onAddCategory: handleAddCategory,
+        onUpdateCategory: handleUpdateCategory,
+        onDeleteCategory: handleDeleteCategory,
+    };
 
     if (currentView === 'course-editor') {
-        return (
-             <ManagementPages
-                view="course-editor"
-                user={authState.user}
-                courseToEdit={editingCourse}
-                onSave={handleSaveCourse}
-                onExit={handleExitCourseEditor}
-                courses={courses}
-                enrollments={enrollments}
-                allUsers={allUsers}
-                conversations={conversations}
-                messages={messages}
-                calendarEvents={calendarEvents}
-                historyLogs={historyLogs}
-                liveSessions={liveSessions}
-                onRefetchData={refetchData}
-                onSendMessage={handleSendMessage}
-                onUpdateMessages={handleUpdateMessages}
-                onScheduleSession={handleScheduleSession}
-                onDeleteSession={handleDeleteSession}
-                onEditCourse={handleEditCourse}
-                onSelectCourse={handleSelectCourse}
-                onSaveUserProfile={handleSaveUserProfile}
-                onUpdatePassword={handleUpdatePassword}
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-            />
-        );
+        return <ManagementPages view="course-editor" {...managementPagesProps} />;
     }
 
     if (currentView === 'player' && selectedCourse) {
@@ -448,37 +491,12 @@ const App: React.FC = () => {
         );
     }
 
-    if (currentView === 'player') {
-        return null;
+    // This handles all other management views
+    if (currentView !== 'player') {
+        return <ManagementPages view={currentView} {...managementPagesProps} />;
     }
 
-    return (
-        <ManagementPages
-            view={currentView}
-            user={authState.user}
-            courses={courses}
-            enrollments={enrollments}
-            allUsers={allUsers}
-            onEditCourse={handleEditCourse}
-            onSelectCourse={handleSelectCourse}
-            conversations={conversations}
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            onUpdateMessages={handleUpdateMessages}
-            calendarEvents={calendarEvents}
-            historyLogs={historyLogs}
-            liveSessions={liveSessions}
-            onScheduleSession={handleScheduleSession}
-            onDeleteSession={handleDeleteSession}
-            onRefetchData={refetchData}
-            onSave={handleSaveCourse}
-            onExit={handleExitCourseEditor}
-            onSaveUserProfile={handleSaveUserProfile}
-            onUpdatePassword={handleUpdatePassword}
-            categories={categories}
-            selectedCategoryId={selectedCategoryId}
-        />
-    )
+    return null; // Should not happen
   }
 
   switch (authState.status) {

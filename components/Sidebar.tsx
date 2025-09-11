@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Role, Category } from '../types';
 import { 
-  LayoutDashboardIcon, LibraryIcon, UserCircleIcon, SettingsIcon, PlayCircleIcon, AwardIcon, type IconProps, UsersIcon, BarChart2Icon, BookOpenIcon, LogOutIcon, XIcon, MailIcon, CalendarIcon, HistoryIcon, VideoIcon, LifeBuoyIcon, ChevronDownIcon, ChevronUpIcon 
+  LayoutDashboardIcon, LibraryIcon, UserCircleIcon, SettingsIcon, PlayCircleIcon, AwardIcon, type IconProps, UsersIcon, BarChart2Icon, BookOpenIcon, LogOutIcon, XIcon, MailIcon, CalendarIcon, HistoryIcon, VideoIcon, LifeBuoyIcon, ChevronDownIcon, ChevronUpIcon, ClipboardListIcon 
 } from './Icons';
 
 // FIX: Added 'course-editor' as a valid view type. It's an internal view like 'player'.
@@ -20,6 +20,7 @@ export type View =
   | 'student-management'
   | 'live-sessions'
   | 'help'
+  | 'course-categories' // New view for managing categories
   | 'course-editor'; // internal view
 
 // New nested type for the tree structure
@@ -118,6 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
     [Role.INSTRUCTOR]: [
       { view: 'dashboard', icon: <LayoutDashboardIcon />, label: 'Dashboard' },
       { view: 'my-courses', icon: <BookOpenIcon />, label: 'My Courses' },
+      { view: 'course-categories', icon: <ClipboardListIcon />, label: 'Categories' },
       { view: 'student-management', icon: <UsersIcon />, label: 'Student Management' },
       { view: 'live-sessions', icon: <VideoIcon />, label: 'Live Sessions' },
       { view: 'inbox', icon: <MailIcon />, label: 'Inbox' },
@@ -129,6 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, viewAsRole, onNaviga
       { view: 'dashboard', icon: <LayoutDashboardIcon />, label: 'Dashboard' },
       // Instructor capabilities
       { view: 'my-courses', icon: <BookOpenIcon />, label: 'My Courses' },
+      { view: 'course-categories', icon: <ClipboardListIcon />, label: 'Categories' },
       { view: 'student-management', icon: <UsersIcon />, label: 'Student Management' },
       { view: 'analytics', icon: <BarChart2Icon />, label: 'Analytics' },
       // Admin capabilities
