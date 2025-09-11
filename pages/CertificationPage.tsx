@@ -772,12 +772,36 @@ const LessonEditModal: React.FC<{
     );
 };
 
+// --- New helpers for category tree rendering ---
+interface CategoryNode extends Category {
+    children: CategoryNode[];
+}
+
+const buildCategoryTree = (items: Category[], parentId: string | null = null): CategoryNode[] => {
+    return items
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+            ...item,
+            children: buildCategoryTree(items, item.id)
+        }));
+};
+
+const renderCategoryOptions = (nodes: CategoryNode[], level: number = 0): JSX.Element[] => {
+    return nodes.flatMap(node => [
+      <option key={node.id} value={node.id}>
+        {'\u00A0'.repeat(level * 4)}{node.name}
+      </option>,
+      ...renderCategoryOptions(node.children, level + 1)
+    ]);
+};
 
 const CourseEditor: React.FC<{ course: Course | null; user: User; onSave: (course: Course) => void; onExit: () => void; categories: Category[] }> = ({ course: initialCourse, user, onSave, onExit, categories }) => {
     const [course, setCourse] = useState<Course>(initialCourse || {
         id: `new-course-${Date.now()}`, title: '', description: '', thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', categoryId: categories[0]?.id || '', instructorId: user.id, instructorName: `${user.firstName} ${user.lastName}`, modules: [], totalLessons: 0, estimatedDuration: 0,
     });
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+
+    const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
 
     const updateCourseField = (field: keyof Course, value: any) => setCourse(prev => ({...prev, [field]: value}));
 
@@ -849,7 +873,7 @@ const CourseEditor: React.FC<{ course: Course | null; user: User; onSave: (cours
                     <div>
                         <label>Category</label>
                         <select value={course.categoryId} onChange={e => updateCourseField('categoryId', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1">
-                            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                            {renderCategoryOptions(categoryTree)}
                         </select>
                     </div>
                     <div><label>Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
