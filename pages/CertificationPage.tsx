@@ -860,21 +860,86 @@ const LessonEditModal: React.FC<{
 
     useEffect(() => {
         if (initialLesson) {
-            setLesson(JSON.parse(JSON.stringify(initialLesson)));
+            // Deep copy to prevent modifying the original state directly
+            const lessonCopy = JSON.parse(JSON.stringify(initialLesson));
+            // Ensure quizData exists for quiz type lessons
+            if (lessonCopy.type === LessonType.QUIZ && !lessonCopy.content.quizData) {
+                lessonCopy.content.quizData = { questions: [], passingScore: 80 };
+            }
+            setLesson(lessonCopy);
         } else {
             setLesson(null);
         }
     }, [initialLesson, isOpen]);
-
+    
     const updateField = (field: keyof Lesson, value: any) => {
         if (!lesson) return;
-        setLesson({ ...lesson, [field]: value });
+        const newLesson = { ...lesson, [field]: value };
+         // If type changes to quiz, ensure quizData is initialized
+        if (field === 'type' && value === LessonType.QUIZ && !newLesson.content.quizData) {
+            newLesson.content.quizData = { questions: [], passingScore: 80 };
+        }
+        setLesson(newLesson);
     };
 
     const updateContentField = (field: keyof Lesson['content'], value: any) => {
         if (!lesson) return;
         setLesson({ ...lesson, content: { ...lesson.content, [field]: value } });
     };
+    
+    const updateQuizData = (field: keyof QuizData, value: any) => {
+        if (!lesson?.content.quizData) return;
+        const newQuizData = { ...lesson.content.quizData, [field]: value };
+        updateContentField('quizData', newQuizData);
+    };
+
+    // --- Quiz Question Handlers ---
+    const addQuestion = () => {
+        const newQuestion: Question = { id: `new-q-${Date.now()}`, questionText: '', options: ['', ''], correctAnswerIndex: 0 };
+        updateQuizData('questions', [...(lesson?.content.quizData?.questions || []), newQuestion]);
+    };
+
+    const updateQuestion = (qIndex: number, text: string) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions[qIndex].questionText = text;
+        updateQuizData('questions', newQuestions);
+    };
+
+    const deleteQuestion = (qIndex: number) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions.splice(qIndex, 1);
+        updateQuizData('questions', newQuestions);
+    };
+
+    const addOption = (qIndex: number) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions[qIndex].options.push('');
+        updateQuizData('questions', newQuestions);
+    };
+    
+    const updateOption = (qIndex: number, oIndex: number, text: string) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions[qIndex].options[oIndex] = text;
+        updateQuizData('questions', newQuestions);
+    };
+
+    const deleteOption = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions[qIndex].options.splice(oIndex, 1);
+        // Adjust correct answer index if it's affected
+        if (newQuestions[qIndex].correctAnswerIndex === oIndex) {
+             newQuestions[qIndex].correctAnswerIndex = 0;
+        } else if (newQuestions[qIndex].correctAnswerIndex > oIndex) {
+             newQuestions[qIndex].correctAnswerIndex -= 1;
+        }
+        updateQuizData('questions', newQuestions);
+    };
+
+    const setCorrectAnswer = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...(lesson?.content.quizData?.questions || [])];
+        newQuestions[qIndex].correctAnswerIndex = oIndex;
+        updateQuizData('questions', newQuestions);
+    }
 
     const handleSave = () => {
         if (lesson) onSave(lesson);
@@ -909,14 +974,47 @@ const LessonEditModal: React.FC<{
                     <div className="space-y-4">
                         <div>
                             <label className="font-semibold">Video Provider</label>
-                            <select value={lesson.content.videoData?.provider} onChange={e => updateContentField('videoData', { ...(lesson.content.videoData || { provider: VideoProvider.YOUTUBE, url: '' }), provider: e.target.value as VideoProvider })} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 capitalize">
+                            <select value={lesson.content.videoData?.provider || VideoProvider.YOUTUBE} onChange={e => updateContentField('videoData', { ...(lesson.content.videoData || { provider: VideoProvider.YOUTUBE, url: '' }), provider: e.target.value as VideoProvider })} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 capitalize">
                                 {Object.values(VideoProvider).map(p => <option key={p} value={p}>{p.replace('_', ' ')}</option>)}
                             </select>
                         </div>
-                         <div><label className="font-semibold">Video URL or ID</label><input type="text" value={lesson.content.videoData?.url} onChange={e => updateContentField('videoData', { ...(lesson.content.videoData || { provider: VideoProvider.YOUTUBE, url: '' }), url: e.target.value })} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
+                         <div><label className="font-semibold">Video URL or ID</label><input type="text" value={lesson.content.videoData?.url || ''} onChange={e => updateContentField('videoData', { ...(lesson.content.videoData || { provider: VideoProvider.YOUTUBE, url: '' }), url: e.target.value })} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"/></div>
                     </div>
                 )}
-                {/* Add UI for PDF and QUIZ types */}
+                
+                {lesson.type === LessonType.QUIZ && (
+                    <div className="space-y-6 border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Quiz Editor</h3>
+                        <div>
+                            <label className="font-semibold">Passing Score (%)</label>
+                            <input type="number" min="0" max="100" value={lesson.content.quizData?.passingScore || 80} onChange={e => updateQuizData('passingScore', parseInt(e.target.value, 10))} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                        </div>
+                        <div className="space-y-4">
+                            {lesson.content.quizData?.questions.map((q, qIndex) => (
+                                <div key={q.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="flex justify-between items-center">
+                                        <label className="font-semibold text-gray-700 dark:text-gray-300">Question {qIndex + 1}</label>
+                                        <button onClick={() => deleteQuestion(qIndex)} className="p-1 text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5"/></button>
+                                    </div>
+                                    <textarea value={q.questionText} onChange={e => updateQuestion(qIndex, e.target.value)} placeholder="Type your question here" className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" rows={2}></textarea>
+                                    <div className="space-y-2">
+                                        {q.options.map((opt, oIndex) => (
+                                            <div key={oIndex} className="flex items-center gap-2">
+                                                <input type="radio" name={`correct-answer-${q.id}`} checked={q.correctAnswerIndex === oIndex} onChange={() => setCorrectAnswer(qIndex, oIndex)} className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 dark:border-gray-500 bg-transparent" />
+                                                <input type="text" value={opt} onChange={e => updateOption(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-grow p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                                <button onClick={() => deleteOption(qIndex, oIndex)} disabled={q.options.length <= 2} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><XIcon className="w-5 h-5"/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => addOption(qIndex)} className="text-sm text-pink-500 font-semibold flex items-center gap-1"><PlusCircleIcon className="w-4 h-4" /> Add Option</button>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={addQuestion} className="w-full bg-pink-100/50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold py-2 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/50 flex items-center justify-center gap-2">
+                           <PlusCircleIcon className="w-5 h-5"/> Add Question
+                        </button>
+                    </div>
+                )}
             </div>
         </Modal>
     );
@@ -1072,6 +1170,35 @@ const CourseEditor: React.FC<{
                     </div>
                     <div><label className="font-semibold">Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
                     <img src={course.thumbnail} alt="Thumbnail preview" className="w-full rounded-lg object-cover aspect-video mt-2" />
+                    
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+                        <h3 className="text-lg font-bold">Quiz Settings</h3>
+                        <div>
+                            <label className="flex items-center gap-3 font-semibold cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={!!course.hasQuizzes} 
+                                    onChange={e => updateCourseField('hasQuizzes', e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-pink-600 focus:ring-pink-500 bg-transparent"
+                                />
+                                Will this course have quizzes?
+                            </label>
+                        </div>
+                        {course.hasQuizzes && (
+                            <div>
+                                <label className="font-semibold">Certification Pass Rate (%)</label>
+                                <input 
+                                    type="number" 
+                                    value={course.certificationPassRate || 80} 
+                                    onChange={e => updateCourseField('certificationPassRate', parseInt(e.target.value, 10))} 
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"
+                                    min="0"
+                                    max="100"
+                                />
+                            </div>
+                        )}
+                    </div>
+
                 </div>
 
                 {/* Curriculum Builder */}

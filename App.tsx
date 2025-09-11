@@ -163,7 +163,7 @@ const App: React.FC = () => {
       const activityEvents: (keyof WindowEventMap)[] = [
         'mousemove',
         'mousedown',
-        'keypress',
+'keypress',
         'scroll',
         'touchstart',
         'keydown',
@@ -260,6 +260,8 @@ const App: React.FC = () => {
                 modules: [],
                 totalLessons: 0,
                 estimatedDuration: 0,
+                hasQuizzes: false,
+                certificationPassRate: 80,
             });
         }
       }

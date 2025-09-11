@@ -1,4 +1,4 @@
-
+// This file defines all the core data structures and types used throughout the application.
 
 export enum Role {
   STUDENT = 'student',
@@ -8,67 +8,13 @@ export enum Role {
 
 export interface User {
   id: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string;
   role: Role;
-  avatarUrl: string;
-  bio: string;
+  avatarUrl?: string;
   company?: string;
-  createdAt: string;
-}
-
-export enum LessonType {
-  VIDEO = 'video',
-  TEXT = 'text',
-  PDF = 'pdf',
-  QUIZ = 'quiz',
-}
-
-export interface Question {
-  id: string;
-  questionText: string;
-  options: string[];
-  correctAnswerIndex: number;
-}
-
-export interface QuizData {
-  questions: Question[];
-  passingScore: number; // Percentage (e.g., 80)
-}
-
-export enum VideoProvider {
-  YOUTUBE = 'youtube',
-  VIMEO = 'vimeo',
-  SELF_HOSTED = 'self_hosted',
-}
-
-export interface VideoData {
-  provider: VideoProvider;
-  url: string; // YouTube ID, Vimeo ID, or full URL for self-hosted
-}
-
-export interface Lesson {
-  id: string;
-  moduleId: string;
-  title: string;
-  type: LessonType;
-  content: {
-    videoData?: VideoData;
-    text?: string;
-    pdfUrl?: string;
-    quizData?: QuizData;
-  };
-  duration: number; // in minutes
-  order: number;
-}
-
-export interface Module {
-  id:string;
-  courseId: string;
-  title: string;
-  lessons: Lesson[];
-  order: number;
+  bio?: string;
 }
 
 export interface Category {
@@ -84,67 +30,100 @@ export interface Course {
   thumbnail: string;
   categoryId: string;
   instructorId: string;
-  instructorName: string; // denormalized for convenience
+  instructorName: string;
   modules: Module[];
   totalLessons: number;
-  estimatedDuration: number; // in hours
+  estimatedDuration: number;
+  hasQuizzes?: boolean;
+  certificationPassRate?: number;
+}
+
+export interface Module {
+  id: string;
+  courseId: string;
+  title: string;
+  lessons: Lesson[];
+  order: number;
+}
+
+export enum LessonType {
+  TEXT = 'text',
+  VIDEO = 'video',
+  PDF = 'pdf',
+  QUIZ = 'quiz',
+}
+
+export enum VideoProvider {
+  YOUTUBE = 'youtube',
+  VIMEO = 'vimeo',
+  SELF_HOSTED = 'self_hosted',
+}
+
+export interface VideoData {
+  provider: VideoProvider;
+  url: string;
+}
+
+export interface Question {
+  id: string;
+  questionText: string;
+  options: string[];
+  correctAnswerIndex: number;
+}
+
+export interface QuizData {
+  questions: Question[];
+  passingScore: number;
+}
+
+export interface Lesson {
+  id: string;
+  moduleId: string;
+  title: string;
+  type: LessonType;
+  content: {
+    text?: string;
+    videoData?: VideoData;
+    pdfUrl?: string;
+    quizData?: QuizData;
+  };
+  duration: number; // in minutes
+  order: number;
 }
 
 export interface Enrollment {
   userId: string;
-  courseId:string;
-  progress: number; // percentage
+  courseId: string;
+  progress: number;
   completedLessonIds: string[];
-  quizScores: {
-      [lessonId: string]: { // key is now lessonId for quiz lessons
-          score: number; // highest score achieved
-          passed: boolean;
-      }
-  };
+  quizScores: Record<string, { score: number; passed: boolean }>;
   lastAccessedLessonId?: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'bot';
-  content: string;
-}
-
-export interface DiscussionPost {
-    id: string;
-    lessonId: string;
-    author: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatarUrl'>;
-    content: string;
-    timestamp: string;
-    replies: DiscussionPost[];
-}
-
-// For Analytics Page
 export interface EngagementData {
-    name: string;
-    value: number;
+  name: string;
+  value: number;
 }
 
-// For Messaging/Inbox
-export interface Message {
+export interface Conversation {
   id: string;
+  participantIds: string[];
+  lastMessageTimestamp?: string;
+}
+
+export interface Message {
+  id?: string;
   conversationId: string;
   senderId: string;
   subject?: string;
   content: string;
   timestamp: string;
-  isRead: boolean;
+  isRead?: boolean;
 }
 
-export interface Conversation {
-  id: string;
-  participantIds: string[]; // [user1_id, user2_id]
-  lastMessageTimestamp: string;
-}
-
-// For Calendar Page
 export interface CalendarEvent {
   id: string;
+  userId: string;
   date: string; // YYYY-MM-DD
   title: string;
   courseId?: string;
@@ -152,25 +131,39 @@ export interface CalendarEvent {
   liveSessionId?: string;
 }
 
-// For History Page
 export type HistoryAction = 'course_enrolled' | 'lesson_completed' | 'quiz_passed' | 'certificate_earned' | 'discussion_posted';
 
 export interface HistoryLog {
-    id: string;
-    userId: string;
-    action: HistoryAction;
-    targetId: string; // e.g., courseId, lessonId
-    targetName: string; // e.g., "Advanced React & TypeScript"
-    timestamp: string; // ISO date string
+  id: string;
+  userId: string;
+  action: HistoryAction;
+  targetId: string;
+  targetName: string;
+  timestamp: string;
 }
 
-// For Live Sessions
 export interface LiveSession {
   id: string;
   title: string;
   description: string;
-  dateTime: string; // ISO String for date and time
+  dateTime: string; // ISO 8601
   duration: number; // in minutes
   instructorId: string;
-  audience: 'all' | string; // 'all' or courseId
+  audience: 'all' | string; // 'all' or a courseId
+}
+
+export interface DiscussionPost {
+  id: string;
+  lessonId: string;
+  authorId: string;
+  content: string;
+  timestamp: string;
+  parentPostId?: string;
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string;
+  };
+  replies: DiscussionPost[];
 }

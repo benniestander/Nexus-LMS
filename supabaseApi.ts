@@ -275,6 +275,8 @@ export const saveCourse = async (course: Course) => {
                 thumbnail: courseData.thumbnail,
                 category_id: courseData.categoryId || null,
                 instructor_id: courseData.instructorId,
+                has_quizzes: courseData.hasQuizzes,
+                certification_pass_rate: courseData.certificationPassRate,
             };
             const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
             if (error) throw new Error(`Failed to create course: ${error.message}`);
@@ -287,6 +289,8 @@ export const saveCourse = async (course: Course) => {
                 thumbnail: courseData.thumbnail,
                 category_id: courseData.categoryId || null,
                 instructor_id: courseData.instructorId,
+                has_quizzes: courseData.hasQuizzes,
+                certification_pass_rate: courseData.certificationPassRate,
             };
             const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
             if (error) throw new Error(`Failed to update course: ${error.message}`);
