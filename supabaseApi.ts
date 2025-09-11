@@ -262,65 +262,97 @@ export const updateEnrollment = async (enrollment: Enrollment): Promise<Enrollme
 
 export const saveCourse = async (course: Course) => {
     try {
-        // 1. Upsert course details
-        const { id, title, description, thumbnail, categoryId, instructorId } = course;
-        const coursePayload = { id, title, description, thumbnail, category_id: categoryId, instructor_id: instructorId };
-        const { error: courseError } = await supabase.from('courses').upsert(coursePayload);
-        if (courseError) throw courseError;
-        
-        // 2. Handle Modules
-        const modulePayloads = course.modules.map((m, index) => ({
-            id: m.id,
-            course_id: course.id,
-            title: m.title,
-            order: index
-        }));
-        const receivedModuleIds = new Set(modulePayloads.map(m => m.id));
-        const { data: existingModules } = await supabase.from('modules').select('id').eq('course_id', course.id);
-        const modulesToDelete = existingModules?.filter(m => !receivedModuleIds.has(m.id)).map(m => m.id) || [];
-        if(modulesToDelete.length > 0) {
-            const { error: deleteModError } = await supabase.from('modules').delete().in('id', modulesToDelete);
-            if (deleteModError) throw deleteModError;
+        const isNewCourse = course.id.startsWith('new-course-');
+        let dbCourseId = course.id;
+        let savedModules: (Module & { lessons: Lesson[] })[] = [];
+
+        // 1. Handle Course Record (Insert vs. Update)
+        if (isNewCourse) {
+            const { id, modules, ...courseData } = course;
+            const payload = {
+                title: courseData.title,
+                description: courseData.description,
+                thumbnail: courseData.thumbnail,
+                category_id: courseData.categoryId,
+                instructor_id: courseData.instructorId,
+            };
+            const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
+            if (error) throw new Error(`Failed to create course: ${error.message}`);
+            dbCourseId = newCourse.id;
+        } else {
+            const { modules, ...courseData } = course;
+            const payload = {
+                title: courseData.title,
+                description: courseData.description,
+                thumbnail: courseData.thumbnail,
+                category_id: courseData.categoryId,
+                instructor_id: courseData.instructorId,
+            };
+            const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
+            if (error) throw new Error(`Failed to update course: ${error.message}`);
         }
-        if(modulePayloads.length > 0) {
-            const { error: moduleError } = await supabase.from('modules').upsert(modulePayloads);
-            if (moduleError) throw moduleError;
+
+        // 2. Handle Modules
+        for (const [index, module] of course.modules.entries()) {
+            const isNewModule = module.id.startsWith('new-module-');
+            const { id, lessons, courseId, ...moduleData } = module;
+            const payload = { ...moduleData, course_id: dbCourseId, order: index };
+
+            let savedModuleId = id;
+            if (isNewModule) {
+                const { data: newModule, error } = await supabase.from('modules').insert(payload).select('id').single();
+                if (error) throw new Error(`Failed to create module: ${error.message}`);
+                savedModuleId = newModule.id;
+            } else {
+                const { error } = await supabase.from('modules').update(payload).eq('id', id);
+                if (error) throw new Error(`Failed to update module: ${error.message}`);
+            }
+            savedModules.push({ ...module, id: savedModuleId, courseId: dbCourseId });
+        }
+
+        const savedModuleIds = new Set(savedModules.map(m => m.id));
+        const { data: existingModules } = await supabase.from('modules').select('id').eq('course_id', dbCourseId);
+        const modulesToDelete = existingModules?.filter(m => !savedModuleIds.has(m.id)).map(m => m.id) || [];
+        if (modulesToDelete.length > 0) {
+            await supabase.from('modules').delete().in('id', modulesToDelete);
         }
 
         // 3. Handle Lessons
-        const lessonPayloads = course.modules.flatMap((m, moduleIndex) => m.lessons.map((l, lessonIndex) => ({
-            id: l.id,
-            module_id: m.id,
-            title: l.title,
-            type: l.type,
-            content: l.content,
-            duration: l.duration,
-            order: lessonIndex
-        })));
-        
-        const receivedLessonIds = new Set(lessonPayloads.map(l => l.id));
-        const allModuleIds = course.modules.map(m => m.id);
-        
-        if (allModuleIds.length > 0) {
-            const { data: existingLessons } = await supabase.from('lessons').select('id').in('module_id', allModuleIds);
-            const lessonsToDelete = existingLessons?.filter(l => !receivedLessonIds.has(l.id)).map(l => l.id) || [];
-            if(lessonsToDelete.length > 0) {
-                 const { error: deleteLesError } = await supabase.from('lessons').delete().in('id', lessonsToDelete);
-                 if (deleteLesError) throw deleteLesError;
+        const allSavedLessonIds = new Set<string>();
+        for (const module of savedModules) {
+            for (const [index, lesson] of module.lessons.entries()) {
+                const isNewLesson = lesson.id.startsWith('new-lesson-');
+                const { id, moduleId, ...lessonData } = lesson;
+                const payload = { ...lessonData, module_id: module.id, order: index };
+
+                let savedLessonId = id;
+                if (isNewLesson) {
+                    const { data: newLesson, error } = await supabase.from('lessons').insert(payload).select('id').single();
+                    if (error) throw new Error(`Failed to create lesson: ${error.message}`);
+                    savedLessonId = newLesson.id;
+                } else {
+                    const { error } = await supabase.from('lessons').update(payload).eq('id', id);
+                    if (error) throw new Error(`Failed to update lesson: ${error.message}`);
+                }
+                allSavedLessonIds.add(savedLessonId);
             }
         }
-       
-        if(lessonPayloads.length > 0) {
-            const { error: lessonError } = await supabase.from('lessons').upsert(lessonPayloads);
-            if (lessonError) throw lessonError;
+        
+        if (savedModuleIds.size > 0) {
+            const { data: existingLessons } = await supabase.from('lessons').select('id').in('module_id', Array.from(savedModuleIds));
+            const lessonsToDelete = existingLessons?.filter(l => !allSavedLessonIds.has(l.id)).map(l => l.id) || [];
+            if (lessonsToDelete.length > 0) {
+                await supabase.from('lessons').delete().in('id', lessonsToDelete);
+            }
         }
         
         return { success: true };
-    } catch(error) {
+    } catch (error: any) {
         console.error("Error saving course:", error);
-        return { success: false, error };
+        return { success: false, error: { message: error.message || 'An unknown error occurred.' } };
     }
 };
+
 
 export const sendMessage = async (newMessage: Omit<Message, 'id' | 'isRead'>) => {
     // This is simplified. A real app would have a backend function to handle finding/creating conversations.
