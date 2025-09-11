@@ -60,7 +60,6 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
 const App: React.FC = () => {
   const [authState, authDispatch] = useReducer(authReducer, initialState);
-  const dataFetchInProgress = useRef(false);
   
   // --- Live Data States ---
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -81,36 +80,17 @@ const App: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // If a fetch is already running, ignore this event to prevent race conditions.
-      if (dataFetchInProgress.current) {
-        return;
-      }
+    let isMounted = true;
 
-      if (session?.user) {
-        dataFetchInProgress.current = true;
+    const fetchAppData = async (sessionUser: { id: string }) => {
         try {
-            const dataLoadingPromise = async () => {
-                const userProfile = await api.getProfile(session.user.id);
-                if (!userProfile) {
-                    throw new Error('Your user profile could not be found. Please contact support.');
-                }
-                
-                const appData = await api.getInitialData(userProfile);
-                if (!appData) {
-                    throw new Error('Failed to load critical application data.');
-                }
+            const userProfile = await api.getProfile(sessionUser.id);
+            if (!userProfile) throw new Error('Your user profile could not be found. Please contact support.');
 
-                return { userProfile, appData };
-            };
-            
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Application timed out while loading data. Please check your network connection and try again.")), 60000)
-            );
+            const appData = await api.getInitialData(userProfile);
+            if (!appData) throw new Error('Failed to load critical application data.');
 
-            const { userProfile, appData } = await Promise.race([dataLoadingPromise(), timeoutPromise]) as { userProfile: User, appData: Awaited<ReturnType<typeof api.getInitialData>> };
-            
-            if (appData) {
+            if (isMounted) {
                 setCourses(appData.courses);
                 setEnrollments(appData.enrollments);
                 setAllUsers(appData.allUsers);
@@ -120,25 +100,42 @@ const App: React.FC = () => {
                 setCalendarEvents(appData.calendarEvents);
                 setHistoryLogs(appData.historyLogs);
                 setLiveSessions(appData.liveSessions);
+                authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
             }
-
-            authDispatch({ type: 'SET_AUTHENTICATED', payload: { user: userProfile } });
         } catch (error: any) {
             console.error("Error during app initialization:", error);
             await supabase.auth.signOut().catch(() => {});
-            authDispatch({ type: 'SET_ERROR', payload: { error: error.message || 'An unknown error occurred during startup.' } });
-        } finally {
-            dataFetchInProgress.current = false;
+            if (isMounted) {
+                authDispatch({ type: 'SET_ERROR', payload: { error: error.message || 'An unknown error occurred during startup.' } });
+            }
         }
-      } else {
-        authDispatch({ type: 'SET_UNAUTHENTICATED' });
-      }
+    };
+
+    const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && isMounted) {
+            await fetchAppData(session.user);
+        } else if (isMounted) {
+            authDispatch({ type: 'SET_UNAUTHENTICATED' });
+        }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!isMounted) return;
+        if (event === 'SIGNED_IN' && session) {
+            fetchAppData(session.user);
+        } else if (event === 'SIGNED_OUT') {
+            authDispatch({ type: 'LOGOUT' });
+        }
     });
 
     return () => {
-      subscription?.unsubscribe();
+        isMounted = false;
+        subscription?.unsubscribe();
     };
-  }, []); // Empty dependency array ensures this effect runs only once on mount.
+  }, []);
 
 
   const handleLogout = useCallback(async () => {

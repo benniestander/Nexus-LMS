@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Great+Vibes&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Plus+Jakarta+Sans:wght@700&family=Source+Sans+Pro:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Great+Vibes&family=Inter:wght@400;500;600;700;800&family=Krub:wght@700&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Source+Sans+Pro:wght@400&display=swap" rel="stylesheet">
     <style>
       body {
         font-family: 'Source Sans Pro', sans-serif;
@@ -17,17 +17,32 @@
       }
       :root {
         --brand-pink: #FA0073;
-        --brand-blue: #1d6fb7;
+        --brand-blue: #0073bd; /* New color: rgb(0, 115, 189) */
         --brand-purple: #7a5af5;
       }
-      h1, h2, h3, h4, h5, h6 {
-        font-family: 'Plus Jakarta Sans', sans-serif;
+
+      /* --- Base Heading Styles --- */
+      h1, h2, h3, h4, h5, h6,
+      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+        font-family: 'Krub', Calibri, sans-serif; /* Changed font to Krub */
         font-weight: 700;
+        font-style: normal;
         color: var(--brand-blue);
       }
-      .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-        color: #559bd4; /* Lighter blue for dark mode */
+
+      .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+      .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+        color: #3895d3; /* Lighter, accessible blue for dark mode */
       }
+
+      /* --- Typographic Scale --- */
+      h1, .prose h1 { font-size: 30px; line-height: 45px; }
+      h2, .prose h2 { font-size: 26px; line-height: 1.4; }
+      h3, .prose h3 { font-size: 22px; line-height: 1.4; }
+      h4, .prose h4 { font-size: 18px; line-height: 1.5; }
+      h5, .prose h5 { font-size: 16px; line-height: 1.5; }
+      h6, .prose h6 { font-size: 14px; line-height: 1.5; }
+
 
       /* --- Typography Overrides for Course Content --- */
       /* By default, Tailwind's prose class uses a system font stack. This ensures it uses our chosen content font. */
@@ -41,16 +56,6 @@
         font-size: 16px;
         font-weight: 400;
         line-height: 1.7;
-      }
-
-      /* The prose plugin also overrides heading styles, so we re-apply our custom heading font for consistency. */
-      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        font-weight: 700;
-        color: var(--brand-blue);
-      }
-      .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
-        color: #559bd4;
       }
 
 
