@@ -254,7 +254,7 @@ const App: React.FC = () => {
                 title: '',
                 description: '',
                 thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', // default placeholder
-                categoryId: categories[0]?.id || '',
+                categoryId: categories[0]?.id || null,
                 instructorId: authState.user.id,
                 instructorName: `${authState.user.firstName} ${authState.user.lastName}`,
                 modules: [],

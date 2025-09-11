@@ -273,7 +273,7 @@ export const saveCourse = async (course: Course) => {
                 title: courseData.title,
                 description: courseData.description,
                 thumbnail: courseData.thumbnail,
-                category_id: courseData.categoryId,
+                category_id: courseData.categoryId || null,
                 instructor_id: courseData.instructorId,
             };
             const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
@@ -285,7 +285,7 @@ export const saveCourse = async (course: Course) => {
                 title: courseData.title,
                 description: courseData.description,
                 thumbnail: courseData.thumbnail,
-                category_id: courseData.categoryId,
+                category_id: courseData.categoryId || null,
                 instructor_id: courseData.instructorId,
             };
             const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
