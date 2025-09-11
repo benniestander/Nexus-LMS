@@ -279,6 +279,7 @@ const App: React.FC = () => {
             hasQuizzes: false,
             isCertificationCourse: withCertification,
             isHidden: true, // New courses start as hidden by default
+            isPublished: false, // New courses start as drafts
         };
 
         if (withCertification) {

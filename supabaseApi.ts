@@ -298,6 +298,7 @@ export const saveCourse = async (course: Course) => {
                 final_exam: courseData.finalExam,
                 is_certification_course: courseData.isCertificationCourse,
                 is_hidden: courseData.isHidden,
+                is_published: courseData.isPublished,
             };
             const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
             if (error) throw new Error(`Failed to create course: ${error.message}`);
@@ -315,6 +316,7 @@ export const saveCourse = async (course: Course) => {
                 final_exam: courseData.finalExam,
                 is_certification_course: courseData.isCertificationCourse,
                 is_hidden: courseData.isHidden,
+                is_published: courseData.isPublished,
             };
             const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
             if (error) throw new Error(`Failed to update course: ${error.message}`);

@@ -1065,7 +1065,7 @@ const CourseEditor: React.FC<{
     onAddCategory: (category: { name: string; parentId: string | null; }) => Promise<{ success: boolean; data?: Category; error?: any; }>;
 }> = ({ course: initialCourse, user, onSave, onExit, categories, onAddCategory }) => {
     const [course, setCourse] = useState<Course>(initialCourse || {
-        id: `new-course-${Date.now()}`, title: '', description: '', thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', categoryId: categories[0]?.id || '', instructorId: user.id, instructorName: `${user.firstName} ${user.lastName}`, modules: [], totalLessons: 0, estimatedDuration: 0,
+        id: `new-course-${Date.now()}`, title: '', description: '', thumbnail: 'https://placehold.co/600x400/e2e8f0/e2e8f0', categoryId: categories[0]?.id || '', instructorId: user.id, instructorName: `${user.firstName} ${user.lastName}`, modules: [], totalLessons: 0, estimatedDuration: 0, isPublished: false,
     });
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [editingQuiz, setEditingQuiz] = useState<{ type: 'module' | 'final'; id: string; data: QuizData | undefined } | null>(null);
@@ -1153,13 +1153,30 @@ const CourseEditor: React.FC<{
         setIsAddingCategory(false);
     };
 
+    const handleSave = (publishState: boolean) => {
+        onSave({ ...course, isPublished: publishState });
+    };
+
     return (
         <div className="p-4 md:p-8">
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-4xl font-bold">{initialCourse ? 'Edit Course' : 'Create New Course'}</h1>
-                <div className="flex gap-4">
-                    <button onClick={onExit} className="bg-gray-200 dark:bg-gray-600 px-6 py-2 rounded-lg font-semibold">Cancel</button>
-                    <button onClick={() => onSave(course)} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-lg">Save Course</button>
+                <div className="flex items-center gap-4">
+                     <span className={`text-sm font-semibold px-3 py-1.5 rounded-full ${course.isPublished ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        Status: {course.isPublished ? 'Published' : 'Draft'}
+                    </span>
+                    <button onClick={onExit} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Cancel</button>
+                    {course.isPublished ? (
+                        <>
+                            <button onClick={() => handleSave(false)} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors">Revert to Draft</button>
+                            <button onClick={() => handleSave(true)} className="bg-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-pink-600 transition-colors">Save Changes</button>
+                        </>
+                    ) : (
+                        <>
+                            <button onClick={() => handleSave(false)} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors">Save Draft</button>
+                            <button onClick={() => handleSave(true)} className="bg-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-pink-600 transition-colors">Publish</button>
+                        </>
+                    )}
                 </div>
             </div>
 

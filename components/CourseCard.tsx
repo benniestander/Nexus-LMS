@@ -21,17 +21,24 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, user, progress, 
   return (
     <div 
       onClick={() => onSelect(course)}
-      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer flex flex-col ${course.isHidden && canManage ? 'opacity-70' : ''}`}
+      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer flex flex-col ${(course.isHidden || !course.isPublished) && canManage ? 'opacity-70' : ''}`}
     >
       <div className="relative">
         <img src={course.thumbnail} alt={course.title} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
         <div className="absolute top-3 right-3 bg-gray-900/50 text-white text-xs font-semibold px-2 py-1 rounded-full">{categoryName}</div>
-        {course.isHidden && canManage && (
-            <div className="absolute top-3 left-3 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                <EyeOffIcon className="w-3 h-3" />
-                HIDDEN
-            </div>
-        )}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+            {course.isHidden && canManage && (
+                <div className="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                    <EyeOffIcon className="w-3 h-3" />
+                    HIDDEN
+                </div>
+            )}
+            {!course.isPublished && canManage && (
+                <div className="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    DRAFT
+                </div>
+            )}
+        </div>
       </div>
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="text-lg font-bold group-hover:text-pink-500 transition-colors">{course.title}</h3>

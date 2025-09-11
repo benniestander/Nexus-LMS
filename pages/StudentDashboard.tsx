@@ -67,7 +67,7 @@ const StudentDashboardComponent: React.FC<{
   };
 
   const filteredCourses = useMemo(() => {
-    const allAvailable = courses.filter(c => !enrolledCourseIds.includes(c.id) && !c.isHidden);
+    const allAvailable = courses.filter(c => !enrolledCourseIds.includes(c.id) && !c.isHidden && c.isPublished);
     if (!selectedCategoryId) {
       return allAvailable;
     }
