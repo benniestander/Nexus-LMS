@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { Course, Enrollment, User, Role, EngagementData, Category } from '../types';
 import { CourseCard } from '../components/CourseCard';
@@ -66,7 +67,7 @@ const StudentDashboardComponent: React.FC<{
   };
 
   const filteredCourses = useMemo(() => {
-    const allAvailable = courses.filter(c => !enrolledCourseIds.includes(c.id));
+    const allAvailable = courses.filter(c => !enrolledCourseIds.includes(c.id) && !c.isHidden);
     if (!selectedCategoryId) {
       return allAvailable;
     }

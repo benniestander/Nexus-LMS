@@ -297,6 +297,7 @@ export const saveCourse = async (course: Course) => {
                 certification_pass_rate: courseData.certificationPassRate,
                 final_exam: courseData.finalExam,
                 is_certification_course: courseData.isCertificationCourse,
+                is_hidden: courseData.isHidden,
             };
             const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
             if (error) throw new Error(`Failed to create course: ${error.message}`);
@@ -313,6 +314,7 @@ export const saveCourse = async (course: Course) => {
                 certification_pass_rate: courseData.certificationPassRate,
                 final_exam: courseData.finalExam,
                 is_certification_course: courseData.isCertificationCourse,
+                is_hidden: courseData.isHidden,
             };
             const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
             if (error) throw new Error(`Failed to update course: ${error.message}`);
@@ -388,6 +390,71 @@ export const saveCourse = async (course: Course) => {
     }
 };
 
+export const deleteCourse = async (courseId: string) => {
+    try {
+        // Step 1: Get all modules and lessons associated with the course
+        const { data: modules, error: modulesError } = await supabase
+            .from('modules')
+            .select('id, lessons(id)')
+            .eq('course_id', courseId);
+        
+        if (modulesError) throw new Error(`Could not fetch modules: ${modulesError.message}`);
+
+        const moduleIds = modules.map(m => m.id);
+        const lessonIds = modules.flatMap(m => m.lessons.map((l: any) => l.id));
+
+        // Step 2: Delete associated data in order
+        if (lessonIds.length > 0) {
+            // Delete discussion posts
+            const { error: discussionError } = await supabase.from('discussion_posts').delete().in('lesson_id', lessonIds);
+            if (discussionError) throw new Error(`Could not delete discussions: ${discussionError.message}`);
+        }
+
+        // Delete quiz attempts for the course
+        const { error: quizAttemptsError } = await supabase.from('quiz_attempts').delete().eq('course_id', courseId);
+        if (quizAttemptsError) throw new Error(`Could not delete quiz attempts: ${quizAttemptsError.message}`);
+
+        // Delete enrollments
+        const { error: enrollmentsError } = await supabase.from('enrollments').delete().eq('course_id', courseId);
+        if (enrollmentsError) throw new Error(`Could not delete enrollments: ${enrollmentsError.message}`);
+
+        if (lessonIds.length > 0) {
+            // Delete lessons
+            const { error: lessonsError } = await supabase.from('lessons').delete().in('id', lessonIds);
+            if (lessonsError) throw new Error(`Could not delete lessons: ${lessonsError.message}`);
+        }
+
+        if (moduleIds.length > 0) {
+            // Delete modules
+            const { error: deleteModulesError } = await supabase.from('modules').delete().in('id', moduleIds);
+            if (deleteModulesError) throw new Error(`Could not delete modules: ${deleteModulesError.message}`);
+        }
+
+        // Finally, delete the course itself
+        const { error: courseError } = await supabase.from('courses').delete().eq('id', courseId);
+        if (courseError) throw new Error(`Could not delete course: ${courseError.message}`);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error deleting course:", error);
+        return { success: false, error: { message: error.message || 'An unknown error occurred.' } };
+    }
+};
+
+export const updateCourseVisibility = async (courseId: string, isHidden: boolean) => {
+    const { data, error } = await supabase
+      .from('courses')
+      .update({ is_hidden: isHidden })
+      .eq('id', courseId)
+      .select('id, is_hidden')
+      .single();
+
+    if (error) {
+      console.error('Error updating course visibility:', error);
+      return { success: false, error };
+    }
+    return { success: true, data: snakeToCamel(data) };
+};
 
 export const sendMessage = async (newMessage: Omit<Message, 'id' | 'isRead'>) => {
     // This is simplified. A real app would have a backend function to handle finding/creating conversations.

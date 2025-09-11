@@ -615,7 +615,7 @@ const ProfilePage: React.FC<{
 
 // ... Other pages like MyCourses, CourseEditor, etc. will be large components.
 // For brevity, let's sketch them out. A real implementation would be more detailed.
-const MyCoursesPage: React.FC<{ user: User, courses: Course[], onEditCourse: (course: Course | null) => void, onSelectCourse: (course: Course) => void, categories: Category[] }> = ({ user, courses, onEditCourse, onSelectCourse, categories }) => {
+const MyCoursesPage: React.FC<{ user: User, courses: Course[], onEditCourse: (course: Course | null) => void, onSelectCourse: (course: Course) => void, categories: Category[], onDeleteCourse: (course: Course) => void, onToggleCourseVisibility: (course: Course) => void }> = ({ user, courses, onEditCourse, onSelectCourse, categories, onDeleteCourse, onToggleCourseVisibility }) => {
     const instructorCourses = courses.filter(c => c.instructorId === user.id);
     const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
     return (
@@ -629,7 +629,7 @@ const MyCoursesPage: React.FC<{ user: User, courses: Course[], onEditCourse: (co
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {instructorCourses.map(course => (
-                    <CourseCard key={course.id} course={course} user={user} onEdit={onEditCourse} onSelect={onSelectCourse} categoryName={categoryMap.get(course.categoryId) || 'Uncategorized'} />
+                    <CourseCard key={course.id} course={course} user={user} onEdit={onEditCourse} onSelect={onSelectCourse} onDelete={onDeleteCourse} onToggleVisibility={onToggleCourseVisibility} categoryName={categoryMap.get(course.categoryId) || 'Uncategorized'} />
                 ))}
             </div>
         </div>
@@ -1291,6 +1291,8 @@ interface ManagementPagesProps {
   allUsers: User[];
   onEditCourse: (course: Course | null) => void;
   onSelectCourse: (course: Course) => void;
+  onDeleteCourse: (course: Course) => void;
+  onToggleCourseVisibility: (course: Course) => void;
   conversations: Conversation[];
   messages: Message[];
   onSendMessage: (recipientIds: string[], subject: string, content: string) => void;
@@ -1320,7 +1322,7 @@ export const ManagementPages: React.FC<ManagementPagesProps> = (props) => {
     case 'certifications':
       return <CertificationsPage user={props.user} courses={props.courses} enrollments={props.enrollments} />;
     case 'my-courses':
-        return <MyCoursesPage user={props.user} courses={props.courses} onEditCourse={props.onEditCourse} onSelectCourse={props.onSelectCourse} categories={props.categories} />;
+        return <MyCoursesPage user={props.user} courses={props.courses} onEditCourse={props.onEditCourse} onSelectCourse={props.onSelectCourse} categories={props.categories} onDeleteCourse={props.onDeleteCourse} onToggleCourseVisibility={props.onToggleCourseVisibility} />;
     case 'course-categories':
         return <CategoriesPage categories={props.categories} courses={props.courses} onAddCategory={props.onAddCategory} onUpdateCategory={props.onUpdateCategory} onDeleteCategory={props.onDeleteCategory} />;
     case 'course-editor':

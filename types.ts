@@ -38,6 +38,7 @@ export interface Course {
   certificationPassRate?: number;
   isCertificationCourse?: boolean; // To track if a course offers a certificate
   finalExam?: QuizData; // End-of-course questionnaire for certification
+  isHidden?: boolean;
 }
 
 export interface Module {

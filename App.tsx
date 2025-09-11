@@ -96,6 +96,8 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCertificationModalOpen, setIsCertificationModalOpen] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   
   useEffect(() => {
     let isMounted = true;
@@ -276,6 +278,7 @@ const App: React.FC = () => {
             estimatedDuration: 0,
             hasQuizzes: false,
             isCertificationCourse: withCertification,
+            isHidden: true, // New courses start as hidden by default
         };
 
         if (withCertification) {
@@ -313,6 +316,39 @@ const App: React.FC = () => {
       alert("Error saving course. Please check the console for details.");
     }
     handleExitCourseEditor();
+  };
+
+  const handleOpenDeleteConfirm = (course: Course) => {
+    setCourseToDelete(course);
+    setIsDeleteConfirmModalOpen(true);
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    setCourseToDelete(null);
+    setIsDeleteConfirmModalOpen(false);
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!courseToDelete) return;
+    const result = await api.deleteCourse(courseToDelete.id);
+    if (result.success) {
+        await refetchData();
+        handleCloseDeleteConfirm();
+    } else {
+        alert(`Error deleting course: ${result.error?.message}`);
+    }
+  };
+  
+  const handleToggleCourseVisibility = async (course: Course) => {
+    const result = await api.updateCourseVisibility(course.id, !course.isHidden);
+    if (result.success) {
+        // Use an optimistic update for a snappy UI response
+        setCourses(prev => prev.map(c => c.id === course.id ? { ...c, isHidden: !c.isHidden } : c));
+    } else {
+        alert(`Error updating course visibility: ${result.error?.message}`);
+        // Optionally refetch to revert optimistic update on failure
+        refetchData();
+    }
   };
 
   const handleSaveUserProfile = async (updates: Partial<User> & { id?: string }) => {
@@ -494,6 +530,8 @@ const App: React.FC = () => {
         onAddCategory: handleAddCategory,
         onUpdateCategory: handleUpdateCategory,
         onDeleteCategory: handleDeleteCategory,
+        onDeleteCourse: handleOpenDeleteConfirm,
+        onToggleCourseVisibility: handleToggleCourseVisibility,
     };
 
     if (currentView === 'course-editor') {
@@ -591,6 +629,19 @@ const App: React.FC = () => {
                     >
                         Yes, add a final exam
                     </button>
+                </div>
+            </Modal>
+             <Modal
+                isOpen={isDeleteConfirmModalOpen}
+                onClose={handleCloseDeleteConfirm}
+                title="Confirm Deletion"
+            >
+                <div>
+                    <p className="text-gray-600 dark:text-gray-400">Are you sure you want to delete the course "<strong>{courseToDelete?.title}</strong>"? This action is irreversible and will delete all associated modules, lessons, and enrollment data.</p>
+                </div>
+                 <div className="flex justify-end gap-4 mt-8">
+                    <button onClick={handleCloseDeleteConfirm} className="bg-gray-200 dark:bg-gray-600 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Cancel</button>
+                    <button onClick={handleDeleteCourse} className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete Course</button>
                 </div>
             </Modal>
           <Sidebar 
