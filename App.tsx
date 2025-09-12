@@ -279,11 +279,6 @@ const App: React.FC = () => {
             isPublished: false, // New courses start as drafts
         };
 
-        if (withCertification) {
-            newCourse.finalExam = { questions: [], passingScore: 80 };
-            newCourse.certificationPassRate = 80;
-        }
-
         setEditingCourse(newCourse);
         setCurrentView('course-editor');
         setIsCertificationModalOpen(false);
@@ -626,7 +621,7 @@ const App: React.FC = () => {
                 <div className="text-center">
                     <h4 className="text-lg font-semibold mb-2">Will this course offer a certificate upon completion?</h4>
                     <p className="text-gray-600 dark:text-gray-400">
-                        Certification courses require a final exam. General courses are for informational purposes only and will not grant a certificate.
+                        Certification is based on passing all module quizzes within the course.
                     </p>
                 </div>
                 <div className="flex justify-center gap-4 mt-8">
@@ -634,13 +629,13 @@ const App: React.FC = () => {
                         onClick={() => handleCreateCourse(false)}
                         className="bg-gray-200 dark:bg-gray-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
                     >
-                        No, it's a general course
+                        No
                     </button>
                     <button 
                         onClick={() => handleCreateCourse(true)}
                         className="bg-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-pink-600 transition-colors"
                     >
-                        Yes, add a final exam
+                        Yes
                     </button>
                 </div>
             </Modal>

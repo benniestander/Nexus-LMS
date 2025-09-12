@@ -170,8 +170,7 @@ const QuizResult: React.FC<{
 
 type CurriculumItem = 
     | { type: 'lesson'; data: Lesson }
-    | { type: 'module-quiz'; data: { module: Course['modules'][0]; quiz: QuizData } }
-    | { type: 'final-exam'; data: { course: Course; quiz: QuizData } };
+    | { type: 'module-quiz'; data: { module: Course['modules'][0]; quiz: QuizData } };
 
 interface CoursePlayerProps {
   user: User;
@@ -192,9 +191,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                 items.push({ type: 'module-quiz', data: { module, quiz: module.quiz } });
             }
         });
-        if (course.finalExam) {
-            items.push({ type: 'final-exam', data: { course, quiz: course.finalExam } });
-        }
         return items;
     }, [course]);
 
@@ -223,7 +219,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     const currentItemIndex = currentItem ? curriculumItems.findIndex(item => {
         if (item.type === 'lesson' && currentItem.type === 'lesson') return item.data.id === currentItem.data.id;
         if (item.type === 'module-quiz' && currentItem.type === 'module-quiz') return item.data.module.id === currentItem.data.module.id;
-        if (item.type === 'final-exam' && currentItem.type === 'final-exam') return item.data.course.id === currentItem.data.course.id;
         return false;
     }) : -1;
     
@@ -231,7 +226,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
         switch (item.type) {
             case 'lesson': return enrollment.completedLessonIds.includes(item.data.id);
             case 'module-quiz': return enrollment.quizScores[`module-${item.data.module.id}`]?.passed === true;
-            case 'final-exam': return enrollment.quizScores[`course-${item.data.course.id}`]?.passed === true;
             default: return false;
         }
     };
@@ -242,7 +236,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
             switch(i.type) {
                 case 'lesson': return i.data.id === (item as any).data.id;
                 case 'module-quiz': return i.data.module.id === (item as any).data.module.id;
-                case 'final-exam': return i.data.course.id === (item as any).data.course.id;
             }
             return false;
         });
@@ -269,7 +262,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
     };
 
     const handleQuizSubmit = (answers: Record<string, number>) => {
-        if (!currentItem || (currentItem.type !== 'module-quiz' && currentItem.type !== 'final-exam' && (currentItem.type === 'lesson' && currentItem.data.type !== 'quiz'))) return;
+        if (!currentItem || (currentItem.type !== 'module-quiz' && (currentItem.type === 'lesson' && currentItem.data.type !== 'quiz'))) return;
         
         let quizData: QuizData;
         let quizKey: string;
@@ -280,9 +273,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
         } else if (currentItem.type === 'module-quiz') {
             quizData = currentItem.data.quiz;
             quizKey = `module-${currentItem.data.module.id}`;
-        } else if (currentItem.type === 'final-exam') {
-            quizData = currentItem.data.quiz;
-            quizKey = `course-${currentItem.data.course.id}`;
         } else {
             return;
         }
@@ -331,8 +321,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                         <p className="text-pink-500 font-semibold">{course.title}</p>
                         <h1 className="text-2xl sm:text-4xl font-bold mt-1">
                             {currentItem?.type === 'lesson' ? currentItem.data.title :
-                             currentItem?.type === 'module-quiz' ? `Quiz: ${currentItem.data.module.title}` :
-                             currentItem?.type === 'final-exam' ? 'Final Exam' : 'Loading...'}
+                             currentItem?.type === 'module-quiz' ? `Quiz: ${currentItem.data.module.title}` : 'Loading...'}
                         </h1>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
@@ -359,8 +348,8 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                         </div>
                     ) : currentItem?.type === 'lesson' && currentItem.data.type === LessonType.TEXT ? (
                         <div className="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg prose prose-lg dark:prose-invert" dangerouslySetInnerHTML={{ __html: currentItem.data.content.text || '' }}></div>
-                    ) : currentItem && (currentItem.type === 'module-quiz' || currentItem.type === 'final-exam') ? (
-                        <QuizView quizData={currentItem.data.quiz} lessonTitle={currentItem.type === 'final-exam' ? 'Final Exam' : `Quiz: ${currentItem.data.module.title}`} onQuizSubmit={handleQuizSubmit} />
+                    ) : currentItem && (currentItem.type === 'module-quiz') ? (
+                        <QuizView quizData={currentItem.data.quiz} lessonTitle={`Quiz: ${currentItem.data.module.title}`} onQuizSubmit={handleQuizSubmit} />
                     ) : currentItem?.type === 'lesson' && currentItem.data.type === LessonType.QUIZ && currentItem.data.content.quizData ? (
                         <QuizView quizData={currentItem.data.content.quizData} lessonTitle={currentItem.data.title} onQuizSubmit={handleQuizSubmit} />
                     ) : null}
@@ -423,18 +412,6 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ user, course, enrollment, o
                             </ul>
                         </div>
                     ))}
-                    {course.finalExam && (() => {
-                        const item = { type: 'final-exam', data: { course, quiz: course.finalExam } } as CurriculumItem;
-                        const isCurrent = currentItem?.type === 'final-exam';
-                        const completed = isItemCompleted(item);
-                        const unlocked = isItemUnlocked(item);
-                        return (
-                             <div className="p-4"><a href="#" onClick={(e) => { e.preventDefault(); if (unlocked) handleSelectItem(item); }} className={`flex items-start gap-3 p-3 rounded-lg mb-1 transition-colors font-bold ${!unlocked ? 'opacity-50 cursor-not-allowed' : (isCurrent ? 'bg-pink-100 dark:bg-pink-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50')}`}>
-                                <div className="mt-0.5 flex-shrink-0 w-5 h-5 flex items-center justify-center">{completed ? <CheckCircle2Icon className="w-5 h-5 text-green-500" /> : (unlocked ? <AwardIcon className="w-5 h-5 text-yellow-500" /> : <LockIcon className="w-4 h-4 text-gray-400"/>)}</div>
-                                <div className="flex-grow"><p className={`${isCurrent ? 'text-pink-600' : ''}`}>Final Exam</p></div>
-                            </a></div>
-                        );
-                    })()}
                 </div>
             </aside>
         </div>

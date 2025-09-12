@@ -425,12 +425,8 @@ const CourseEditor: React.FC<{
     };
 
     const saveQuiz = (quizData: QuizData) => {
-        if (!editingQuiz) return;
-        if (editingQuiz.type === 'final') {
-            updateCourseField('finalExam', quizData);
-        } else if (editingQuiz.type === 'module') {
-            updateModule(editingQuiz.id, { quiz: quizData });
-        }
+        if (!editingQuiz || editingQuiz.type !== 'module') return;
+        updateModule(editingQuiz.id, { quiz: quizData });
         setEditingQuiz(null);
     };
     
@@ -546,17 +542,6 @@ const CourseEditor: React.FC<{
                     </div>
                     <div><label className="font-semibold">Thumbnail URL</label><input type="text" value={course.thumbnail} onChange={e => updateCourseField('thumbnail', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
                     <img src={course.thumbnail} alt="Thumbnail preview" className="w-full rounded-lg object-cover aspect-video mt-2" />
-                    
-                    {course.isCertificationCourse !== false && (
-                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
-                            <h3 className="text-lg font-bold">Final Exam</h3>
-                            <p className="text-sm text-gray-500">Add a final exam required for certification. This will be presented to students after completing all modules.</p>
-                            <button onClick={() => setEditingQuiz({ type: 'final', id: course.id, data: course.finalExam })} className="w-full flex items-center justify-center gap-2 bg-blue-100/50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
-                                 <EditIcon className="w-4 h-4" /> {course.finalExam && course.finalExam.questions.length > 0 ? 'Edit Final Exam' : 'Add Final Exam'}
-                            </button>
-                        </div>
-                    )}
-
                 </div>
 
                 {/* Curriculum Builder */}
@@ -590,7 +575,7 @@ const CourseEditor: React.FC<{
             </div>
 
             <LessonEditModal isOpen={!!editingLesson} onClose={() => setEditingLesson(null)} lesson={editingLesson} onSave={saveLesson} />
-            <QuizEditorModal isOpen={!!editingQuiz} onClose={() => setEditingQuiz(null)} quizData={editingQuiz?.data} onSave={saveQuiz} title={editingQuiz?.type === 'final' ? 'Final Exam Editor' : 'Module Quiz Editor'} />
+            <QuizEditorModal isOpen={!!editingQuiz} onClose={() => setEditingQuiz(null)} quizData={editingQuiz?.data} onSave={saveQuiz} title={'Module Quiz Editor'} />
         </div>
     );
 };

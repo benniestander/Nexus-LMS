@@ -90,20 +90,23 @@ const CertificationsPage: React.FC<{ user: User; courses: Course[]; enrollments:
     const completedCourses = useMemo(() => {
         return enrollments
             .filter(e => {
-                if (e.userId !== user.id || e.progress < 100) return false;
-                const course = courses.find(c => c.id === e.courseId);
-                if (!course) return false;
+                if (e.userId !== user.id) return false;
                 
-                // If the course is explicitly non-certifiable, it shouldn't appear here.
-                if (course.isCertificationCourse === false) return false;
+                const course = courses.find(c => c.id === e.courseId);
+                if (!course || !course.isCertificationCourse) return false;
 
-                // If a course has a final exam, the student must have passed it.
-                if (course.finalExam) {
-                    const finalExamScore = e.quizScores[`course-${course.id}`];
-                    return finalExamScore?.passed === true;
-                }
-                // If no final exam, 100% progress is enough.
-                return true;
+                // Find all modules in this course that *have* a quiz.
+                const modulesWithQuizzes = course.modules.filter(m => m.quiz && m.quiz.questions.length > 0);
+
+                // If there are no quizzes, the student cannot get a certificate based on this logic.
+                // Could be changed to 100% progress if needed.
+                if (modulesWithQuizzes.length === 0) return false;
+
+                // Check if the student has passed EVERY module quiz.
+                return modulesWithQuizzes.every(module => {
+                    const moduleQuizScore = e.quizScores[`module-${module.id}`];
+                    return moduleQuizScore?.passed === true;
+                });
             })
             .map(e => courses.find(c => c.id === e.courseId))
             .filter((c): c is Course => c !== undefined);
@@ -159,7 +162,7 @@ const CertificationsPage: React.FC<{ user: User; courses: Course[]; enrollments:
                 <div className="text-center py-16 bg-gray-100 dark:bg-gray-800 rounded-lg w-full max-w-2xl">
                     <AwardIcon className="w-16 h-16 mx-auto text-gray-400" />
                     <h2 className="mt-4 text-2xl font-semibold">No Certificates Yet</h2>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Complete a course and pass the final exam (if any) to earn your certificate.</p>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Complete a course and pass all required quizzes to earn your certificate.</p>
                 </div>
             </div>
         );

@@ -35,9 +35,7 @@ export interface Course {
   totalLessons: number;
   estimatedDuration: number;
   hasQuizzes?: boolean;
-  certificationPassRate?: number;
   isCertificationCourse?: boolean; // To track if a course offers a certificate
-  finalExam?: QuizData; // End-of-course questionnaire for certification
   isHidden?: boolean;
   isPublished?: boolean;
 }
