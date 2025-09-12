@@ -278,62 +278,51 @@ export const saveCourse = async (course: Course) => {
         let savedModules: (Module & { lessons: Lesson[] })[] = [];
 
         // 1. Handle Course Record (Insert vs. Update)
+        const coursePayload = {
+            title: course.title,
+            description: course.description,
+            thumbnail: course.thumbnail,
+            category_id: course.categoryId || null,
+            instructor_id: course.instructorId,
+            has_quizzes: course.hasQuizzes,
+            certification_pass_rate: course.certificationPassRate,
+            final_exam: course.finalExam,
+            is_certification_course: course.isCertificationCourse,
+            is_hidden: course.isHidden,
+            is_published: course.isPublished,
+        };
+
         if (isNewCourse) {
-            const { id, modules, ...courseData } = course;
-            const payload = {
-                title: courseData.title,
-                description: courseData.description,
-                thumbnail: courseData.thumbnail,
-                category_id: courseData.categoryId || null,
-                instructor_id: courseData.instructorId,
-                has_quizzes: courseData.hasQuizzes,
-                certification_pass_rate: courseData.certificationPassRate,
-                final_exam: courseData.finalExam,
-                is_certification_course: courseData.isCertificationCourse,
-                is_hidden: courseData.isHidden,
-                is_published: courseData.isPublished,
-            };
-            const { data: newCourse, error } = await supabase.from('courses').insert(payload).select('id').single();
+            const { data: newCourse, error } = await supabase.from('courses').insert(coursePayload).select('id').single();
             if (error) throw new Error(`Failed to create course: ${error.message}`);
             dbCourseId = newCourse.id;
         } else {
-            const { modules, ...courseData } = course;
-            const payload = {
-                title: courseData.title,
-                description: courseData.description,
-                thumbnail: courseData.thumbnail,
-                category_id: courseData.categoryId || null,
-                instructor_id: courseData.instructorId,
-                has_quizzes: courseData.hasQuizzes,
-                certification_pass_rate: courseData.certificationPassRate,
-                final_exam: courseData.finalExam,
-                is_certification_course: courseData.isCertificationCourse,
-                is_hidden: courseData.isHidden,
-                is_published: courseData.isPublished,
-            };
-            const { error } = await supabase.from('courses').update(payload).eq('id', dbCourseId);
+            const { error } = await supabase.from('courses').update(coursePayload).eq('id', dbCourseId);
             if (error) throw new Error(`Failed to update course: ${error.message}`);
         }
 
         // 2. Handle Modules
         for (const [index, module] of course.modules.entries()) {
             const isNewModule = module.id.startsWith('new-module-');
-
-            // FIX: Explicitly construct payload to prevent sending camelCase properties from spread operator.
-            const payload = {
-                title: module.title,
-                quiz: module.quiz,
-                order: index,
-                course_id: dbCourseId,
-            };
-
             let savedModuleId = module.id;
+
             if (isNewModule) {
-                const { data: newModule, error } = await supabase.from('modules').insert(payload).select('id').single();
+                const insertPayload = {
+                    title: module.title,
+                    quiz: module.quiz,
+                    order: index,
+                    course_id: dbCourseId,
+                };
+                const { data: newModule, error } = await supabase.from('modules').insert(insertPayload).select('id').single();
                 if (error) throw new Error(`Failed to create module: ${error.message}`);
                 savedModuleId = newModule.id;
             } else {
-                const { error } = await supabase.from('modules').update(payload).eq('id', module.id);
+                const updatePayload = {
+                    title: module.title,
+                    quiz: module.quiz,
+                    order: index,
+                };
+                const { error } = await supabase.from('modules').update(updatePayload).eq('id', module.id);
                 if (error) throw new Error(`Failed to update module: ${error.message}`);
             }
             savedModules.push({ ...module, id: savedModuleId, courseId: dbCourseId });
@@ -351,25 +340,29 @@ export const saveCourse = async (course: Course) => {
         for (const module of savedModules) {
             for (const [index, lesson] of module.lessons.entries()) {
                 const isNewLesson = lesson.id.startsWith('new-lesson-');
-                const { id, moduleId, ...lessonData } = lesson;
-                // FIX: Explicitly construct payload to ensure correct column names (snake_case vs camelCase).
-                // The spread operator was sending camelCase keys which the database does not have.
-                const payload = {
-                    title: lessonData.title,
-                    type: lessonData.type,
-                    content: lessonData.content,
-                    duration: lessonData.duration,
-                    order: index,
-                    module_id: module.id
-                };
+                let savedLessonId = lesson.id;
 
-                let savedLessonId = id;
                 if (isNewLesson) {
-                    const { data: newLesson, error } = await supabase.from('lessons').insert(payload).select('id').single();
+                     const insertPayload = {
+                        title: lesson.title,
+                        type: lesson.type,
+                        content: lesson.content,
+                        duration: lesson.duration,
+                        order: index,
+                        module_id: module.id
+                    };
+                    const { data: newLesson, error } = await supabase.from('lessons').insert(insertPayload).select('id').single();
                     if (error) throw new Error(`Failed to create lesson: ${error.message}`);
                     savedLessonId = newLesson.id;
                 } else {
-                    const { error } = await supabase.from('lessons').update(payload).eq('id', id);
+                     const updatePayload = {
+                        title: lesson.title,
+                        type: lesson.type,
+                        content: lesson.content,
+                        duration: lesson.duration,
+                        order: index,
+                    };
+                    const { error } = await supabase.from('lessons').update(updatePayload).eq('id', lesson.id);
                     if (error) throw new Error(`Failed to update lesson: ${error.message}`);
                 }
                 allSavedLessonIds.add(savedLessonId);
