@@ -307,13 +307,27 @@ const App: React.FC = () => {
   }
 
   const handleSaveCourse = async (updatedCourse: Course) => {
+    // Foreign key validation for category.
+    // An empty categoryId is caught by the editor's own validation,
+    // so we only check for non-empty, invalid IDs.
+    if (updatedCourse.categoryId && !categories.some(cat => cat.id === updatedCourse.categoryId)) {
+        alert("The selected category no longer exists. Please choose a different category before saving.");
+        
+        // Update the editor's state via props to clear the invalid category
+        // and force the user to re-select.
+        setEditingCourse({ ...updatedCourse, categoryId: '' });
+
+        return; // Stop the save process
+    }
+
     const result = await api.saveCourse(updatedCourse);
-    if(result.success) {
-      refetchData();
+    if (result.success) {
+      await refetchData();
+      handleExitCourseEditor(); // Exit ONLY on success
     } else {
+      // Don't exit on error, so user can retry without losing their work.
       alert("Error saving course. Please check the console for details.");
     }
-    handleExitCourseEditor();
   };
 
   const handleOpenDeleteConfirm = (course: Course) => {

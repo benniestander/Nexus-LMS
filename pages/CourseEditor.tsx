@@ -125,7 +125,7 @@ const QuizEditorModal: React.FC<{
             <div className="space-y-6">
                 <div>
                     <label className="font-semibold">Passing Score (%)</label>
-                    <input type="number" min="0" max="100" value={quizData.passingScore} onChange={e => updateQuizField('passingScore', parseInt(e.target.value, 10))} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="number" min="0" max="100" value={quizData.passingScore} onChange={e => updateQuizField('passingScore', parseInt(e.target.value, 10) || 0)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
                 </div>
                 <div className="space-y-4">
                     {quizData.questions.map((q, qIndex) => (
@@ -268,6 +268,14 @@ const CourseEditor: React.FC<{
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [errors, setErrors] = useState<{ title?: string; categoryId?: string }>({});
 
+    // Effect to sync internal state with the course prop from App.tsx.
+    // This is crucial for reacting to external state changes, like resetting an invalid category.
+    useEffect(() => {
+        if (initialCourse) {
+            setCourse(initialCourse);
+        }
+    }, [initialCourse]);
+    
     const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
     
     const validateCourse = (): boolean => {
@@ -484,44 +492,31 @@ const CourseEditor: React.FC<{
                         <button onClick={addModule} className="flex items-center gap-2 text-sm font-semibold text-pink-500"><PlusCircleIcon className="w-5 h-5" /> Add Module</button>
                     </div>
                     {course.modules.map(module => (
-                        <div key={module.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <input type="text" value={module.title} onChange={e => updateModule(module.id, { title: e.target.value })} className="font-bold text-lg bg-transparent border-none focus:ring-0 w-full" />
-                                <button onClick={() => deleteModule(module.id)} className="text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5"/></button>
+                        <div key={module.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4">
+                             <div className="flex items-center gap-4">
+                                <input type="text" value={module.title} onChange={e => updateModule(module.id, { title: e.target.value })} className="flex-grow font-bold text-lg bg-transparent focus:outline-none focus:ring-0 border-none p-0"/>
+                                <button onClick={() => setEditingQuiz({ type: 'module', id: module.id, data: module.quiz })} className="p-2 text-gray-500 hover:text-pink-500" title="Edit Module Quiz"><EditIcon className="w-5 h-5" /></button>
+                                <button onClick={() => deleteModule(module.id)} className="p-2 text-gray-500 hover:text-red-500" title="Delete Module"><Trash2Icon className="w-5 h-5" /></button>
                             </div>
-                             <ul className="mt-4 space-y-2">
+                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
                                 {module.lessons.map(lesson => (
-                                    <li key={lesson.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md gap-2">
-                                        <p className="flex-grow">{lesson.title}</p>
-                                        <div className="flex gap-1 flex-shrink-0">
-                                            <button onClick={() => setEditingLesson(lesson)} className="p-1 text-gray-400 hover:text-pink-500" title="Edit lesson details">
-                                                <EditIcon className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => deleteLesson(module.id, lesson.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete lesson">
-                                                <Trash2Icon className="w-4 h-4" />
-                                            </button>
+                                    <div key={lesson.id} className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                        <span>{lesson.title}</span>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => setEditingLesson(lesson)} className="p-1 text-gray-500 hover:text-pink-500"><EditIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => deleteLesson(module.id, lesson.id)} className="p-1 text-gray-500 hover:text-red-500"><Trash2Icon className="w-4 h-4" /></button>
                                         </div>
-                                    </li>
+                                    </div>
                                 ))}
-                            </ul>
-                            <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 flex justify-between items-center">
-                                <button onClick={() => addLesson(module.id)} className="text-sm text-pink-500 font-semibold flex items-center gap-2"><PlusCircleIcon className="w-4 h-4"/> Add Lesson</button>
-                                <button onClick={() => setEditingQuiz({ type: 'module', id: module.id, data: module.quiz })} className="text-sm text-blue-500 font-semibold flex items-center gap-2"><EditIcon className="w-4 h-4"/> {module.quiz ? 'Edit Module Quiz' : 'Add Module Quiz'}</button>
+                                <button onClick={() => addLesson(module.id)} className="w-full text-center text-sm py-2 text-pink-500 font-semibold hover:bg-pink-50 dark:hover:bg-pink-900/30 rounded-lg">+ Add Lesson</button>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
-             <LessonEditModal isOpen={!!editingLesson} onClose={() => setEditingLesson(null)} lesson={editingLesson} onSave={saveLesson} />
-             {editingQuiz && (
-                 <QuizEditorModal 
-                    isOpen={!!editingQuiz}
-                    onClose={() => setEditingQuiz(null)}
-                    quizData={editingQuiz.data}
-                    onSave={saveQuiz}
-                    title={editingQuiz.type === 'final' ? 'Final Exam Editor' : 'Module Quiz Editor'}
-                 />
-             )}
+
+            <LessonEditModal isOpen={!!editingLesson} onClose={() => setEditingLesson(null)} lesson={editingLesson} onSave={saveLesson} />
+            <QuizEditorModal isOpen={!!editingQuiz} onClose={() => setEditingQuiz(null)} quizData={editingQuiz?.data} onSave={saveQuiz} title={editingQuiz?.type === 'final' ? 'Final Exam Editor' : 'Module Quiz Editor'} />
         </div>
     );
 };
