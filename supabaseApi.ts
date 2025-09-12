@@ -318,16 +318,22 @@ export const saveCourse = async (course: Course) => {
         // 2. Handle Modules
         for (const [index, module] of course.modules.entries()) {
             const isNewModule = module.id.startsWith('new-module-');
-            const { id, lessons, courseId, ...moduleData } = module;
-            const payload = { ...moduleData, course_id: dbCourseId, order: index };
 
-            let savedModuleId = id;
+            // FIX: Explicitly construct payload to prevent sending camelCase properties from spread operator.
+            const payload = {
+                title: module.title,
+                quiz: module.quiz,
+                order: index,
+                course_id: dbCourseId,
+            };
+
+            let savedModuleId = module.id;
             if (isNewModule) {
                 const { data: newModule, error } = await supabase.from('modules').insert(payload).select('id').single();
                 if (error) throw new Error(`Failed to create module: ${error.message}`);
                 savedModuleId = newModule.id;
             } else {
-                const { error } = await supabase.from('modules').update(payload).eq('id', id);
+                const { error } = await supabase.from('modules').update(payload).eq('id', module.id);
                 if (error) throw new Error(`Failed to update module: ${error.message}`);
             }
             savedModules.push({ ...module, id: savedModuleId, courseId: dbCourseId });
