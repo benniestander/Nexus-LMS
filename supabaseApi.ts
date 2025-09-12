@@ -278,13 +278,16 @@ export const saveCourse = async (course: Course) => {
         let savedModules: (Module & { lessons: Lesson[] })[] = [];
 
         // 1. Handle Course Record (Insert vs. Update)
+        // FIX: Recalculate hasQuizzes based on the current state of the course content.
+        const hasQuizzes = course.modules.some(module => module.quiz && module.quiz.questions.length > 0) || (!!course.finalExam && course.finalExam.questions.length > 0);
+
         const coursePayload = {
             title: course.title,
             description: course.description,
             thumbnail: course.thumbnail,
             category_id: course.categoryId || null,
             instructor_id: course.instructorId,
-            has_quizzes: course.hasQuizzes,
+            has_quizzes: hasQuizzes,
             certification_pass_rate: course.certificationPassRate,
             final_exam: course.finalExam,
             is_certification_course: course.isCertificationCourse,
