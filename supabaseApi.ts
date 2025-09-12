@@ -27,59 +27,78 @@ export const snakeToCamel = (obj: any): any => {
 // ====================================================================================
 
 export const getProfile = async (userId: string): Promise<User | null> => {
-    // 1. Try to fetch the existing profile
+    // First, try to fetch the profile. A simple select is fastest if the profile exists.
     const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`*`)
         .eq('id', userId)
         .single();
 
-    // If we get an error that is NOT "0 rows", something is wrong.
-    // PGRST116 is the code for " esattamente una riga" (exactly one row) not being found.
-    if (profileError && profileError.code !== 'PGRST116') {
-        console.error("Error fetching profile:", profileError.message);
-        return null;
-    }
-    
-    // 2. If profile exists, return it
+    // If profile is found, we're done.
     if (profileData) {
         return snakeToCamel(profileData);
     }
 
-    // 3. If profile does NOT exist, create it. This handles the race condition on first login.
-    console.warn(`Profile not found for user ${userId}. Attempting to create one.`);
+    // If the error is anything other than "not found", it's a real error.
+    if (profileError && profileError.code !== 'PGRST116') {
+        console.error("Error fetching profile:", profileError.message);
+        return null;
+    }
 
+    // At this point, the profile was not found. This could be a race condition
+    // with the creation trigger. We'll attempt to create it, but ignore the
+    // error if it was just created by the trigger.
+    console.warn(`Profile not found for user ${userId}. Attempting to create one as a fallback.`);
+    
     // Get user details from auth to create the profile
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Safety check in case the session is invalid
     if (!user || user.id !== userId) {
         console.error("Mismatched user or unable to get auth user to create profile.");
         return null;
     }
-
-    // Insert a new profile using auth details
-    const { data: newProfile, error: insertError } = await supabase
+    
+    // Use upsert with ignoreDuplicates to perform an "INSERT ... ON CONFLICT DO NOTHING".
+    // This atomically handles the race condition.
+    const { error: upsertError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
             id: user.id,
             email: user.email,
             first_name: user.user_metadata?.firstName || '',
             last_name: user.user_metadata?.lastName || '',
-            // The `handle_new_user` trigger should ideally set the role, 
-            // but we default to 'student' as a fallback.
             role: user.user_metadata?.role || 'student',
-        })
-        .select()
+        }, {
+            ignoreDuplicates: true,
+            onConflict: 'id',
+        });
+    
+    // An error here is unexpected unless it's a policy violation or DB issue.
+    if (upsertError) {
+         console.error("Error during profile upsert:", upsertError.message);
+         return null;
+    }
+
+    // After the upsert, the profile is guaranteed to exist. Fetch it again.
+    const { data: finalProfileData, error: finalFetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
         .single();
 
-    if (insertError) {
-        console.error("Error creating new profile:", insertError.message);
+    if (finalFetchError) {
+        console.error("CRITICAL: Failed to fetch profile even after upsert:", finalFetchError.message);
         return null;
     }
 
-    console.log(`Successfully created new profile for user ${userId}.`);
-    return snakeToCamel(newProfile);
+    if (finalProfileData) {
+        console.log(`Successfully ensured profile exists for user ${userId}.`);
+        return snakeToCamel(finalProfileData);
+    }
+    
+    // This path should be unreachable.
+    console.error("Unreachable code in getProfile: profile not found after successful upsert.");
+    return null;
 }
 
 
