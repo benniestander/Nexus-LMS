@@ -266,10 +266,32 @@ const CourseEditor: React.FC<{
     const [newInlineCategoryName, setNewInlineCategoryName] = useState('');
     const [newInlineCategoryParentId, setNewInlineCategoryParentId] = useState<string | null>(null);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [errors, setErrors] = useState<{ title?: string; categoryId?: string }>({});
 
     const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
+    
+    const validateCourse = (): boolean => {
+        const newErrors: { title?: string; categoryId?: string } = {};
+        if (!course.title.trim()) {
+            newErrors.title = 'Course title is required.';
+        }
+        if (!course.categoryId) {
+            newErrors.categoryId = 'Please select a category.';
+        }
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
-    const updateCourseField = (field: keyof Course, value: any) => setCourse(prev => ({...prev, [field]: value}));
+    const updateCourseField = (field: keyof Course, value: any) => {
+        if (errors[field as keyof typeof errors]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field as keyof typeof errors];
+                return newErrors;
+            });
+        }
+        setCourse(prev => ({...prev, [field]: value}));
+    };
 
     const addModule = () => {
         const newModule: Module = { id: `new-module-${Date.now()}`, courseId: course.id, title: 'New Module', lessons: [], order: course.modules.length };
@@ -347,7 +369,9 @@ const CourseEditor: React.FC<{
     };
 
     const handleSave = (publishState: boolean) => {
-        onSave({ ...course, isPublished: publishState });
+        if (validateCourse()) {
+            onSave({ ...course, isPublished: publishState });
+        }
     };
 
     return (
@@ -377,7 +401,16 @@ const CourseEditor: React.FC<{
                 {/* Course Details */}
                 <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md space-y-4 self-start sticky top-28">
                     <h2 className="text-xl font-bold">Course Details</h2>
-                    <div><label className="font-semibold">Title</label><input type="text" value={course.title} onChange={e => updateCourseField('title', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1"/></div>
+                    <div>
+                        <label className="font-semibold">Title</label>
+                        <input 
+                            type="text" 
+                            value={course.title} 
+                            onChange={e => updateCourseField('title', e.target.value)} 
+                            className={`w-full p-2 border rounded-lg dark:bg-gray-700 mt-1 ${errors.title ? 'border-red-500' : 'dark:border-gray-600'}`}
+                        />
+                        {errors.title && <p className="text-sm text-red-500 mt-1">{errors.title}</p>}
+                    </div>
                     
                     <RichTextEditor
                         label="Description"
@@ -387,10 +420,15 @@ const CourseEditor: React.FC<{
 
                     <div>
                         <label className="font-semibold">Category</label>
-                        <select value={course.categoryId} onChange={e => updateCourseField('categoryId', e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mt-1">
+                        <select 
+                            value={course.categoryId} 
+                            onChange={e => updateCourseField('categoryId', e.target.value)} 
+                            className={`w-full p-2 border rounded-lg dark:bg-gray-700 mt-1 ${errors.categoryId ? 'border-red-500' : 'dark:border-gray-600'}`}
+                        >
                              <option value="">Select a category</option>
                             {renderCategoryOptions(categoryTree)}
                         </select>
+                        {errors.categoryId && <p className="text-sm text-red-500 mt-1">{errors.categoryId}</p>}
                         {!showNewCategoryForm ? (
                              <button type="button" onClick={() => setShowNewCategoryForm(true)} className="text-sm text-pink-500 mt-2 hover:underline">+ Add New Category</button>
                         ) : (
