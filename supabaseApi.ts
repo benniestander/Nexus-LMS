@@ -365,6 +365,12 @@ export const saveCourse = async (course: Course) => {
         }
 
         // 2. Handle Modules
+        // NOTE: The following operations require correctly configured RLS policies on the 'modules' table.
+        // A database error like "syntax error at or near ','" in a CREATE POLICY statement indicates
+        // that a policy is incorrectly combining INSERT, UPDATE, and DELETE commands with only a USING clause.
+        // The fix must be applied in the Supabase SQL editor by splitting the policy:
+        // 1. One policy for INSERT using the `WITH CHECK` clause.
+        // 2. A separate policy for UPDATE and DELETE using the `USING` clause.
         for (const [index, module] of course.modules.entries()) {
             const isNewModule = module.id.startsWith('new-module-');
             let savedModuleId = module.id;
