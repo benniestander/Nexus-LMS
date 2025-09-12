@@ -333,6 +333,15 @@ export const saveQuizAttempt = async (attempt: Omit<QuizAttempt, 'id' | 'submitt
     return { success: true, data: snakeToCamel(data) };
 };
 
+// --- DATABASE NOTE ---
+// All data modification functions below depend on correctly configured
+// Row-Level Security (RLS) policies in your Supabase database.
+// If you encounter permission errors or unexpected behavior, the first
+// step is to ensure your policies are correct.
+//
+// A complete, verified RLS setup script is provided in the `SETUP.sql`
+// file in the root of this project. Run this script in your Supabase
+// SQL Editor to fix any policy-related problems.
 export const saveCourse = async (course: Course) => {
     try {
         const isNewCourse = course.id.startsWith('new-course-');
@@ -365,12 +374,6 @@ export const saveCourse = async (course: Course) => {
         }
 
         // 2. Handle Modules
-        // NOTE: The following operations require correctly configured RLS policies on the 'modules' table.
-        // A database error like "syntax error at or near ','" in a CREATE POLICY statement indicates
-        // that a policy is incorrectly combining INSERT, UPDATE, and DELETE commands with only a USING clause.
-        // The fix must be applied in the Supabase SQL editor by splitting the policy:
-        // 1. One policy for INSERT using the `WITH CHECK` clause.
-        // 2. A separate policy for UPDATE and DELETE using the `USING` clause.
         for (const [index, module] of course.modules.entries()) {
             const isNewModule = module.id.startsWith('new-module-');
             let savedModuleId = module.id;
