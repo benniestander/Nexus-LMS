@@ -166,9 +166,7 @@ const LessonEditModal: React.FC<{
 
     useEffect(() => {
         if (initialLesson) {
-            // Deep copy to prevent modifying the original state directly
             const lessonCopy = JSON.parse(JSON.stringify(initialLesson));
-            // Ensure quizData exists for quiz type lessons
             if (lessonCopy.type === LessonType.QUIZ && !lessonCopy.content.quizData) {
                 lessonCopy.content.quizData = { questions: [], passingScore: 80 };
             }
@@ -181,7 +179,6 @@ const LessonEditModal: React.FC<{
     const updateField = (field: keyof Lesson, value: any) => {
         if (!lesson) return;
         const newLesson = { ...lesson, [field]: value };
-         // If type changes to quiz, ensure quizData is initialized
         if (field === 'type' && value === LessonType.QUIZ && !newLesson.content.quizData) {
             newLesson.content.quizData = { questions: [], passingScore: 80 };
         }
@@ -196,6 +193,59 @@ const LessonEditModal: React.FC<{
     const handleSave = () => {
         if (lesson) onSave(lesson);
     };
+
+    // --- Inline Quiz Editor Handlers ---
+    const updateQuizFieldInLesson = (field: keyof QuizData, value: any) => {
+        if (!lesson?.content.quizData) return;
+        const newQuizData = { ...lesson.content.quizData, [field]: value };
+        updateContentField('quizData', newQuizData);
+    };
+
+    const addQuestionInLesson = () => {
+        if (!lesson?.content.quizData) return;
+        const newQuestion: Question = { id: `new-q-${Date.now()}`, questionText: '', options: ['', ''], correctAnswerIndex: 0 };
+        const newQuestions = [...lesson.content.quizData.questions, newQuestion];
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const updateQuestionInLesson = (qIndex: number, text: string) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = [...lesson.content.quizData.questions];
+        newQuestions[qIndex].questionText = text;
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const deleteQuestionInLesson = (qIndex: number) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = lesson.content.quizData.questions.filter((_, idx) => idx !== qIndex);
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const addOptionInLesson = (qIndex: number) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = [...lesson.content.quizData.questions];
+        newQuestions[qIndex].options.push('');
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const updateOptionInLesson = (qIndex: number, oIndex: number, text: string) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = [...lesson.content.quizData.questions];
+        newQuestions[qIndex].options[oIndex] = text;
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const deleteOptionInLesson = (qIndex: number, oIndex: number) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = [...lesson.content.quizData.questions];
+        newQuestions[qIndex].options.splice(oIndex, 1);
+        if (newQuestions[qIndex].correctAnswerIndex >= oIndex) {
+            newQuestions[qIndex].correctAnswerIndex = Math.max(0, newQuestions[qIndex].correctAnswerIndex - 1);
+        }
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    const setCorrectAnswerInLesson = (qIndex: number, oIndex: number) => {
+        if (!lesson?.content.quizData) return;
+        const newQuestions = [...lesson.content.quizData.questions];
+        newQuestions[qIndex].correctAnswerIndex = oIndex;
+        updateQuizFieldInLesson('questions', newQuestions);
+    };
+    // --- End Inline Quiz Editor Handlers ---
 
     if (!isOpen || !lesson) return null;
 
@@ -234,14 +284,38 @@ const LessonEditModal: React.FC<{
                     </div>
                 )}
                 
-                {lesson.type === LessonType.QUIZ && (
-                   <QuizEditorModal 
-                        isOpen={true} 
-                        onClose={()=>{}} 
-                        quizData={lesson.content.quizData} 
-                        onSave={(newQuizData) => updateContentField('quizData', newQuizData)} 
-                        title="Lesson Quiz Editor"
-                    />
+                {lesson.type === LessonType.QUIZ && lesson.content.quizData && (
+                   <div className="space-y-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <h4 className="text-lg font-bold">Quiz Content</h4>
+                        <div>
+                            <label className="font-semibold">Passing Score (%)</label>
+                            <input type="number" min="0" max="100" value={lesson.content.quizData.passingScore} onChange={e => updateQuizFieldInLesson('passingScore', parseInt(e.target.value, 10) || 0)} className="w-full mt-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                        </div>
+                        <div className="space-y-4">
+                            {lesson.content.quizData.questions.map((q, qIndex) => (
+                                <div key={q.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="flex justify-between items-center">
+                                        <label className="font-semibold text-gray-700 dark:text-gray-300">Question {qIndex + 1}</label>
+                                        <button onClick={() => deleteQuestionInLesson(qIndex)} className="p-1 text-gray-400 hover:text-red-500"><Trash2Icon className="w-5 h-5" /></button>
+                                    </div>
+                                    <textarea value={q.questionText} onChange={e => updateQuestionInLesson(qIndex, e.target.value)} placeholder="Type your question here" className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" rows={2}></textarea>
+                                    <div className="space-y-2">
+                                        {q.options.map((opt, oIndex) => (
+                                            <div key={oIndex} className="flex items-center gap-2">
+                                                <input type="radio" name={`correct-answer-${q.id}`} checked={q.correctAnswerIndex === oIndex} onChange={() => setCorrectAnswerInLesson(qIndex, oIndex)} className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 dark:border-gray-500 bg-transparent" />
+                                                <input type="text" value={opt} onChange={e => updateOptionInLesson(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-grow p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+                                                <button onClick={() => deleteOptionInLesson(qIndex, oIndex)} disabled={q.options.length <= 2} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><XIcon className="w-5 h-5" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => addOptionInLesson(qIndex)} className="text-sm text-pink-500 font-semibold flex items-center gap-1"><PlusCircleIcon className="w-4 h-4" /> Add Option</button>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={addQuestionInLesson} className="w-full bg-pink-100/50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold py-2 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/50 flex items-center justify-center gap-2">
+                            <PlusCircleIcon className="w-5 h-5" /> Add Question
+                        </button>
+                    </div>
                 )}
             </div>
         </Modal>
