@@ -27,18 +27,61 @@ export const snakeToCamel = (obj: any): any => {
 // ====================================================================================
 
 export const getProfile = async (userId: string): Promise<User | null> => {
-    const { data, error } = await supabase
+    // 1. Try to fetch the existing profile
+    const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`*`)
         .eq('id', userId)
         .single();
-    
-    if (error) {
-        console.error("Error fetching profile:", error.message);
+
+    // If we get an error that is NOT "0 rows", something is wrong.
+    // PGRST116 is the code for " esattamente una riga" (exactly one row) not being found.
+    if (profileError && profileError.code !== 'PGRST116') {
+        console.error("Error fetching profile:", profileError.message);
         return null;
     }
-    return snakeToCamel(data);
+    
+    // 2. If profile exists, return it
+    if (profileData) {
+        return snakeToCamel(profileData);
+    }
+
+    // 3. If profile does NOT exist, create it. This handles the race condition on first login.
+    console.warn(`Profile not found for user ${userId}. Attempting to create one.`);
+
+    // Get user details from auth to create the profile
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Safety check in case the session is invalid
+    if (!user || user.id !== userId) {
+        console.error("Mismatched user or unable to get auth user to create profile.");
+        return null;
+    }
+
+    // Insert a new profile using auth details
+    const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+            id: user.id,
+            email: user.email,
+            first_name: user.user_metadata?.firstName || '',
+            last_name: user.user_metadata?.lastName || '',
+            // The `handle_new_user` trigger should ideally set the role, 
+            // but we default to 'student' as a fallback.
+            role: user.user_metadata?.role || 'student',
+        })
+        .select()
+        .single();
+
+    if (insertError) {
+        console.error("Error creating new profile:", insertError.message);
+        return null;
+    }
+
+    console.log(`Successfully created new profile for user ${userId}.`);
+    return snakeToCamel(newProfile);
 }
+
 
 export const getInitialData = async (user: User) => {
     try {
