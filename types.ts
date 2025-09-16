@@ -15,6 +15,7 @@ export interface User {
   avatarUrl?: string;
   company?: string;
   bio?: string;
+  isDegraded?: boolean; // Flag for when profile data couldn't be loaded from the DB
 }
 
 export interface Category {
