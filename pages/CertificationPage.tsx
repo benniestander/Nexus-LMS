@@ -332,7 +332,7 @@ const InboxPage: React.FC<{
                  {user.role !== Role.STUDENT ? (
                      <div>
                          <label className="font-semibold block mb-2">To:</label>
-                         <select multiple value={recipients} onChange={e => setRecipients(Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value))} className="w-full p-2 border rounded-lg h-40 dark:bg-gray-700 dark:border-gray-600">
+                         <select multiple value={recipients} onChange={e => setRecipients(Array.from(e.target.selectedOptions, option => option.value))} className="w-full p-2 border rounded-lg h-40 dark:bg-gray-700 dark:border-gray-600">
                              {myStudents.map(student => (
                                  <option key={student.id} value={student.id}>{student.firstName} {student.lastName}</option>
                              ))}

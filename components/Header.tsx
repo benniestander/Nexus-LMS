@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({ user, viewAsRole, onSetViewAsRol
             </div>
             <div className="text-left hidden md:block">
               <p className="text-sm font-semibold text-gray-800 dark:text-white">{user.firstName} {user.lastName}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{viewAsRole}</p>
             </div>
             <ChevronDownIcon className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>

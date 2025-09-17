@@ -1,6 +1,14 @@
 import { supabase } from './supabaseClient';
 import { Course, Enrollment, User, Role, Module, Lesson, DiscussionPost, Conversation, Message, CalendarEvent, LiveSession, Category, QuizAttempt } from './types';
 
+// --- DATABASE NOTE ---
+// If you are experiencing "internal error" screens or data failing to load,
+// it is almost certainly due to missing or incorrect Row-Level Security (RLS)
+// policies in your Supabase database.
+//
+// The application will now guide you through fixing this if an error is detected.
+// A full, correct configuration script is available in the error screen inside App.tsx.
+
 // ====================================================================================
 // ===== DATA TRANSFORMATION UTILS
 // ====================================================================================
@@ -33,6 +41,27 @@ export const getProfile = async (userId: string): Promise<User | null> => {
         .select(`*`)
         .eq('id', userId)
         .single();
+
+    // Gracefully handle RLS permission errors by falling back to auth data.
+    // This allows the app to load in a degraded state and prompt the user to fix the issue.
+    if (profileError && profileError.code === '42501') { // '42501' is 'permission_denied'
+        console.warn("Permission denied fetching profile. Falling back to auth data. This indicates an RLS policy issue.");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const degradedUser: User = {
+                id: user.id,
+                email: user.email || '',
+                firstName: user.user_metadata?.firstName || 'New',
+                lastName: user.user_metadata?.lastName || 'User',
+                role: user.user_metadata?.role || Role.STUDENT,
+                isDegraded: true,
+            };
+            return degradedUser;
+        } else {
+             console.error("Could not get auth user even after a profile fetch error.");
+             return null;
+        }
+    }
 
     // If profile is found, we're done.
     if (profileData) {
@@ -105,9 +134,14 @@ export const getProfile = async (userId: string): Promise<User | null> => {
 export const getInitialData = async (user: User) => {
     try {
         // 1. Define role-based queries for all sensitive/user-specific data
-        const enrollmentsPromise = user.role === Role.ADMIN
-            ? supabase.from('enrollments').select('*')
-            : supabase.from('enrollments').select('*').eq('user_id', user.id);
+        let enrollmentsPromise;
+        if (user.role === Role.ADMIN || user.role === Role.INSTRUCTOR) {
+            // RLS policies will ensure admins see all and instructors see only their students' enrollments.
+            enrollmentsPromise = supabase.from('enrollments').select('*');
+        } else { // STUDENT
+            // For students, this is a performance optimization to only fetch their own.
+            enrollmentsPromise = supabase.from('enrollments').select('*').eq('user_id', user.id);
+        }
         
         const conversationsPromise = user.role === Role.ADMIN
             ? supabase.from('conversations').select('*')
@@ -147,8 +181,11 @@ export const getInitialData = async (user: User) => {
         const firstBatchResults = { coursesRes, modulesRes, lessonsRes, enrollmentsRes, usersRes, conversationsRes, calendarEventsRes, liveSessionsRes, categoriesRes };
         for (const [key, result] of Object.entries(firstBatchResults)) {
             if (result.error) {
-                console.error(`Error fetching ${key}:`, result.error);
-                throw result.error;
+                console.error(`Error fetching ${key}:`, result.error.message || result.error);
+                // Add context to the error object itself and re-throw
+                const contextualError = result.error as any;
+                contextualError.stage = key;
+                throw contextualError;
             }
         }
         
@@ -163,7 +200,11 @@ export const getInitialData = async (user: User) => {
                 : { data: [], error: null };
         }
             
-        if (messagesRes.error) throw messagesRes.error;
+        if (messagesRes.error) {
+             const contextualError = messagesRes.error as any;
+             contextualError.stage = 'messagesRes';
+             throw contextualError;
+        }
 
         // 5. Transform and assemble the final data structure
         const allUsers: User[] = snakeToCamel(usersRes.data || []);
@@ -203,7 +244,7 @@ export const getInitialData = async (user: User) => {
         };
 
     } catch (error) {
-        console.error("Error fetching initial dashboard data:", error);
+        console.error("Caught error during initial data fetch:", error);
         throw error;
     }
 };
@@ -333,15 +374,6 @@ export const saveQuizAttempt = async (attempt: Omit<QuizAttempt, 'id' | 'submitt
     return { success: true, data: snakeToCamel(data) };
 };
 
-// --- DATABASE NOTE ---
-// All data modification functions below depend on correctly configured
-// Row-Level Security (RLS) policies in your Supabase database.
-// If you encounter permission errors or unexpected behavior, the first
-// step is to ensure your policies are correct.
-//
-// A complete, verified RLS setup script is provided in the `SETUP.sql`
-// file in the root of this project. Run this script in your Supabase
-// SQL Editor to fix any policy-related problems.
 export const saveCourse = async (course: Course) => {
     try {
         const isNewCourse = course.id.startsWith('new-course-');
@@ -461,13 +493,22 @@ export const deleteCourse = async (courseId: string) => {
         // Step 1: Get all modules and lessons associated with the course
         const { data: modules, error: modulesError } = await supabase
             .from('modules')
-            .select('id, lessons(id)')
+            .select('id')
             .eq('course_id', courseId);
         
         if (modulesError) throw new Error(`Could not fetch modules: ${modulesError.message}`);
-
+        
         const moduleIds = modules.map(m => m.id);
-        const lessonIds = modules.flatMap(m => m.lessons.map((l: any) => l.id));
+        let lessonIds: string[] = [];
+
+        if (moduleIds.length > 0) {
+            const { data: lessons, error: lessonsError } = await supabase
+                .from('lessons')
+                .select('id')
+                .in('module_id', moduleIds);
+            if (lessonsError) throw new Error(`Could not fetch lessons: ${lessonsError.message}`);
+            lessonIds = lessons.map(l => l.id);
+        }
 
         // Step 2: Delete associated data in order
         if (lessonIds.length > 0) {
